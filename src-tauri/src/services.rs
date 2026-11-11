@@ -206,17 +206,56 @@ unsafe extern "system" fn keyboard_hook_proc(
                     WIN_NUMBER_HELD.store(0, Ordering::Relaxed);
                 } else if is_up {
                     WIN_KEY_DOWN.store(false, Ordering::Relaxed);
-                    WIN_NUMBER_HELD.store(0, Ordering::Relaxed);
+                    let had_number = WIN_NUMBER_HELD.swap(0, Ordering::Relaxed);
+                    if had_number == 0 {
+                        // Solitary Win key tap: user opened or closed Start Menu.
+                        if let Some(app) = KEYBOARD_HOOK_APP_HANDLE
+                            .get()
+                            .cloned()
+                            .or_else(|| WINDOW_CHANGE_APP_HANDLE.get().cloned())
+                        {
+                            tauri::async_runtime::spawn(async move {
+                                for delay in [40, 100, 220] {
+                                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                                    let open = crate::commands::is_start_menu_open();
+                                    if open {
+                                        let _ = app.emit_to("dock", "dock-search-open", ());
+                                        break;
+                                    } else if delay == 220 {
+                                        let _ = app.emit_to("dock", "dock-search-close", ());
+                                    }
+                                }
+                            });
+                        }
+                    }
                 }
             } else if WIN_KEY_DOWN.load(Ordering::Relaxed) {
-                if vk_code.0 == 0x53 && is_down {
-                    let search_was_open = crate::commands::is_start_menu_open();
+                // Win + Space: instant toggle dock reveal in peek/smart mode
+                if vk_code.0 == 0x20 && is_down {
                     if let Some(app) = KEYBOARD_HOOK_APP_HANDLE.get().cloned() {
                         tauri::async_runtime::spawn(async move {
-                            if search_was_open {
-                                let _ = app.emit_to("dock", "dock-search-close", ());
-                            } else {
-                                let _ = app.emit_to("dock", "dock-search-open", ());
+                            let _ = app.emit_to("dock", "dock-toggle-hotkey", ());
+                        });
+                    }
+                    send_start_menu_mask();
+                    return windows::Win32::Foundation::LRESULT(1);
+                }
+                if vk_code.0 == 0x53 && is_down {
+                    if let Some(app) = KEYBOARD_HOOK_APP_HANDLE
+                        .get()
+                        .cloned()
+                        .or_else(|| WINDOW_CHANGE_APP_HANDLE.get().cloned())
+                    {
+                        tauri::async_runtime::spawn(async move {
+                            for delay in [40, 100, 220] {
+                                tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                                let open = crate::commands::is_start_menu_open();
+                                if open {
+                                    let _ = app.emit_to("dock", "dock-search-open", ());
+                                    break;
+                                } else if delay == 220 {
+                                    let _ = app.emit_to("dock", "dock-search-close", ());
+                                }
                             }
                         });
                     }
@@ -300,7 +339,7 @@ pub fn setup_window_change_hook(app_handle: AppHandle) {
         use windows::Win32::UI::Accessibility::SetWinEventHook;
         use windows::Win32::UI::WindowsAndMessaging::{
             EVENT_OBJECT_CREATE, EVENT_OBJECT_DESTROY, EVENT_OBJECT_HIDE, EVENT_OBJECT_SHOW,
-            WINEVENT_OUTOFCONTEXT,
+            EVENT_SYSTEM_FOREGROUND, WINEVENT_OUTOFCONTEXT,
         };
 
         // Hook create and destroy events for top-level windows
@@ -341,9 +380,19 @@ pub fn setup_window_change_hook(app_handle: AppHandle) {
             0,
             WINEVENT_OUTOFCONTEXT,
         );
+        let _fg_hook = SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            None,
+            Some(window_change_event_proc),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT,
+        );
 
         // Store hooks to prevent them from being dropped
         Box::leak(Box::new(_create_hook));
+        Box::leak(Box::new(_fg_hook));
     }
 }
 
@@ -376,6 +425,22 @@ unsafe extern "system" fn window_change_event_proc(
         if event == EVENT_OBJECT_SHOW || event == EVENT_OBJECT_HIDE || event == EVENT_OBJECT_DESTROY
         {
             CAPTURE_RECHECK.store(true, Ordering::Relaxed);
+        }
+    }
+
+    // Check if the Start menu or Windows Search state changed on foreground/show/hide:
+    static START_MENU_ACTIVE: AtomicBool = AtomicBool::new(false);
+    let start_open = crate::commands::is_start_menu_open();
+    let was_open = START_MENU_ACTIVE.swap(start_open, Ordering::Relaxed);
+    if start_open != was_open {
+        if let Some(app) = WINDOW_CHANGE_APP_HANDLE.get().cloned() {
+            tauri::async_runtime::spawn(async move {
+                if start_open {
+                    let _ = app.emit_to("dock", "dock-search-open", ());
+                } else {
+                    let _ = app.emit_to("dock", "dock-search-close", ());
+                }
+            });
         }
     }
 

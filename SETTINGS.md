@@ -38,6 +38,9 @@ Edit `settings.json` with any text editor while Bloom is running. Changes are ap
 | `bloom-dock-extras-recycle-bin`    | `"true"` / `"false"`             | `"true"`      | Show the Recycle Bin in the dock extras. The icon reflects whether the bin holds anything.                                                                                       |
 | `bloom-dock-extras-folders`        | comma-separated ids              | `"downloads"` | Known folders in the dock extras: any of `desktop`, `downloads`, `documents`, `pictures`, `music`, `videos`, or `"none"` for no folders.                                         |
 | `bloom-dock-extras-custom-folders` | JSON array                       | `"[]"`        | User-added folders, e.g. `[{"name":"Projects","path":"D:\\Projects"}]`. Folders that no longer exist are skipped until they return.                                              |
+| `bloom-dock-material`              | `"glass"` / `"acrylic"` / `"mica"` / `"solid"` | `"glass"` | Dock backdrop blur and surface material styling.                                                                                                |
+| `bloom-dock-icon-theme`            | `"native"` / `"squircle"` / `"neon"` / `"monochrome"` | `"native"` | Icon pack theme applied to dock icons (native, macOS-style squircles, cyber neon, or minimal monochrome).                                      |
+| `bloom-dock-downloads-enabled`     | `"true"` / `"false"`             | `"true"`      | Show the Downloads Progress Hub on the left dock to track ongoing browser and system downloads in real-time.                                     |
 
 ### Notch
 

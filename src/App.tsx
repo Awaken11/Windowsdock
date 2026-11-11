@@ -81,7 +81,9 @@ import {
 	ZoomIn,
 	ZoomOut,
 	Maximize2,
-	Copy
+	Copy,
+	FileEdit,
+	Pin
 } from "lucide-react";
 
 /**
@@ -1589,6 +1591,44 @@ function App() {
 		}
 	}, [shelfItems, shelfPersist]);
 
+	const [shelfTab, setShelfTab] = useState<"files" | "notes">("files");
+	const [scratchpadNote, setScratchpadNote] = useState(
+		() => localStorage.getItem("awaken-scratchpad-note") || ""
+	);
+	const [noteCopied, setNoteCopied] = useState(false);
+
+	useEffect(() => {
+		try {
+			localStorage.setItem("awaken-scratchpad-note", scratchpadNote);
+		} catch (_) {}
+	}, [scratchpadNote]);
+
+	const [pinnedClipIds, setPinnedClipIds] = useState<Set<string>>(() => {
+		try {
+			const raw = localStorage.getItem("awaken-pinned-clips");
+			return raw ? new Set(JSON.parse(raw)) : new Set();
+		} catch {
+			return new Set();
+		}
+	});
+	const [clipboardFilter, setClipboardFilter] = useState<"all" | "pinned">("all");
+
+	const togglePinClip = (id: string, e: React.MouseEvent) => {
+		e.stopPropagation();
+		setPinnedClipIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) {
+				next.delete(id);
+			} else {
+				next.add(id);
+			}
+			try {
+				localStorage.setItem("awaken-pinned-clips", JSON.stringify([...next]));
+			} catch (_) {}
+			return next;
+		});
+	};
+
 	useEffect(() => {
 		invoke<ClipboardItem[]>("get_clipboard_history")
 			.then((items) => {
@@ -1609,6 +1649,18 @@ function App() {
 			if (notificationHoverTimer.current) clearTimeout(notificationHoverTimer.current);
 		};
 	}, []);
+
+	const displayClipboardItems = useMemo(() => {
+		let items = [...clipboardItems];
+		if (clipboardFilter === "pinned") {
+			items = items.filter((item) => pinnedClipIds.has(item.id));
+		}
+		return items.sort((a, b) => {
+			const aPinned = pinnedClipIds.has(a.id) ? 1 : 0;
+			const bPinned = pinnedClipIds.has(b.id) ? 1 : 0;
+			return bPinned - aPinned;
+		});
+	}, [clipboardItems, pinnedClipIds, clipboardFilter]);
 
 	// Drop file references whose files are gone (moved/deleted/drive unplugged)
 	// once at startup, so a persisted shelf does not accumulate dead entries.
@@ -3368,10 +3420,10 @@ function App() {
 		if (bloomMode === "notification" && activeNotification) return 390;
 		if (bloomMode === "notifications") return 400;
 		if (isCalendarMode) return 480;
-		if (bloomMode === "shelf") return 380;
+		if (bloomMode === "shelf") return shelfTab === "notes" ? 420 : 380;
 		if (bloomMode === "clipboard") {
 			if (zoomedImageItem) return 520;
-			return clipboardItems.length <= 1 ? 320 : 490;
+			return displayClipboardItems.length <= 1 ? 320 : 490;
 		}
 		if (bloomMode === "command-center" && isOpen) return COMMAND_CENTER_WIDTH;
 		if (bloomMode === "wifi" || bloomMode === "bluetooth") return COMMAND_CENTER_WIDTH;
@@ -3421,12 +3473,13 @@ function App() {
 		// hover during an OS drag) and is sized to exactly one row of tiles,
 		// plus room for the scrollbar once the tiles overflow it.
 		if (bloomMode === "shelf") {
+			if (shelfTab === "notes") return 260;
 			return shelfItems.length === 0 ? 140 : 196;
 		}
 		if (bloomMode === "clipboard") {
 			if (zoomedImageItem) return 340;
-			if (clipboardItems.length === 0) return 130;
-			const rows = Math.min(Math.max(1, Math.ceil(clipboardItems.length / 2)), 5);
+			if (displayClipboardItems.length === 0) return 130;
+			const rows = Math.min(Math.max(1, Math.ceil(displayClipboardItems.length / 2)), 5);
 			return Math.round(82 + rows * 41);
 		}
 		if (bloomMode === "command-center") return isOpen ? 230 : 36;
@@ -4808,12 +4861,27 @@ function App() {
 										>
 											{shelfNotice && <div className="shelf-notice">{shelfNotice}</div>}
 											<div className="shelf-header-clean">
-												<div className="shelf-header-title">
-													<Inbox size={13} strokeWidth={2.2} />
-													<span>Drop Shelf</span>
-													{shelfItems.length > 0 && <span className="shelf-header-badge">{shelfItems.length}</span>}
+												<div className="shelf-header-tabs">
+													<button
+														type="button"
+														className={`shelf-tab-btn ${shelfTab === "files" ? "active" : ""}`}
+														onClick={() => setShelfTab("files")}
+													>
+														<Inbox size={12} strokeWidth={2.2} />
+														<span>Files</span>
+														{shelfItems.length > 0 && <span className="shelf-header-badge">{shelfItems.length}</span>}
+													</button>
+													<button
+														type="button"
+														className={`shelf-tab-btn ${shelfTab === "notes" ? "active" : ""}`}
+														onClick={() => setShelfTab("notes")}
+													>
+														<FileEdit size={12} strokeWidth={2.2} />
+														<span>Scratchpad</span>
+														{scratchpadNote.trim().length > 0 && <span className="shelf-notes-dot" />}
+													</button>
 												</div>
-												{shelfItems.length > 0 && (
+												{shelfTab === "files" && shelfItems.length > 0 && (
 													<button
 														type="button"
 														className="shelf-clear-btn"
@@ -4828,7 +4896,54 @@ function App() {
 													</button>
 												)}
 											</div>
-											{shelfItems.length === 0 ? (
+											{shelfTab === "notes" ? (
+												<div className="shelf-scratchpad-view">
+													<textarea
+														className="shelf-scratchpad-textarea"
+														placeholder="Write quick notes, markdown snippets, or paste text..."
+														value={scratchpadNote}
+														onChange={(e) => setScratchpadNote(e.target.value)}
+														autoFocus
+													/>
+													<div className="shelf-scratchpad-footer">
+														<div className="shelf-scratchpad-stats">
+															{scratchpadNote.trim().length === 0
+																? "Empty note"
+																: `${scratchpadNote.trim().split(/\s+/).filter(Boolean).length} words · ${scratchpadNote.length} chars`}
+														</div>
+														<div className="shelf-scratchpad-actions">
+															{scratchpadNote.length > 0 && (
+																<button
+																	type="button"
+																	className="shelf-scratchpad-btn"
+																	title="Clear note"
+																	onClick={() => setScratchpadNote("")}
+																>
+																	<Trash2 size={11} />
+																	<span>Clear</span>
+																</button>
+															)}
+															<button
+																type="button"
+																className={`shelf-scratchpad-btn primary ${noteCopied ? "copied" : ""}`}
+																title="Copy note to clipboard"
+																onClick={async () => {
+																	try {
+																		await writeText(scratchpadNote);
+																	} catch {
+																		await navigator.clipboard.writeText(scratchpadNote).catch(() => {});
+																	}
+																	setNoteCopied(true);
+																	setTimeout(() => setNoteCopied(false), 1200);
+																}}
+															>
+																{noteCopied ? <Check size={11} /> : <Copy size={11} />}
+																<span>{noteCopied ? "Copied" : "Copy Note"}</span>
+															</button>
+														</div>
+													</div>
+												</div>
+											) : shelfItems.length === 0 ? (
 												<div className="shelf-empty">
 													<span>Drop files or selected text here</span>
 												</div>
@@ -5043,31 +5158,59 @@ function App() {
 											) : (
 												<>
 													<div className="shelf-header-clean">
-														<div className="shelf-header-title">
-															<Clipboard size={13} strokeWidth={2.2} />
-															<span>Clipboard</span>
-															{clipboardItems.length > 0 && <span className="shelf-header-badge">{clipboardItems.length}</span>}
+														<div className="shelf-header-tabs">
+															<button
+																type="button"
+																className={`shelf-tab-btn ${clipboardFilter === "all" ? "active" : ""}`}
+																onClick={() => setClipboardFilter("all")}
+															>
+																<Clipboard size={12} strokeWidth={2.2} />
+																<span>All</span>
+																{clipboardItems.length > 0 && <span className="shelf-header-badge">{clipboardItems.length}</span>}
+															</button>
+															<button
+																type="button"
+																className={`shelf-tab-btn ${clipboardFilter === "pinned" ? "active" : ""}`}
+																onClick={() => setClipboardFilter("pinned")}
+															>
+																<Pin size={11} strokeWidth={2.2} />
+																<span>Pinned</span>
+																{pinnedClipIds.size > 0 && <span className="shelf-header-badge">{pinnedClipIds.size}</span>}
+															</button>
 														</div>
 														{clipboardItems.length > 0 && (
 															<button
 																type="button"
 																className="shelf-clear-btn"
-																onClick={() => invoke("clear_clipboard_history").catch(() => {})}
-																title="Clear clipboard history"
+																onClick={() => {
+																	if (pinnedClipIds.size === 0) {
+																		invoke("clear_clipboard_history").catch(() => {});
+																	} else {
+																		const unpinned = clipboardItems.filter((i) => !pinnedClipIds.has(i.id));
+																		for (const u of unpinned) {
+																			invoke("remove_clipboard_item", { id: u.id }).catch(() => {});
+																		}
+																	}
+																}}
+																title={pinnedClipIds.size > 0 ? "Clear unpinned clipboard history" : "Clear clipboard history"}
 															>
 																<Trash2 size={12} />
 																<span>Clear</span>
 															</button>
 														)}
 													</div>
-													{clipboardItems.length === 0 ? (
+													{displayClipboardItems.length === 0 ? (
 														<div className="shelf-empty">
-															<span>No recent clips yet — copy text, links, or images</span>
+															<span>
+																{clipboardFilter === "pinned"
+																	? "No pinned snippets yet — click the pin icon on any clip"
+																	: "No recent clips yet — copy text, links, or images"}
+															</span>
 														</div>
 													) : (
 														<div className="clip-stream-grid">
 															<AnimatePresence mode="popLayout">
-																{clipboardItems.map((item) => {
+																{displayClipboardItems.map((item) => {
 																	const isCopied = copiedId === item.id;
 																	const isImage = item.kind === "image";
 																	const getClipSnippet = () => {
@@ -5102,7 +5245,7 @@ function App() {
 																			initial={{ opacity: 0, scale: 0.94 }}
 																			animate={{ opacity: 1, scale: 1 }}
 																			exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.1 } }}
-																			className={`clip-cell ${isImage ? "is-image" : ""} ${isCopied ? "copied" : ""}`}
+																			className={`clip-cell ${isImage ? "is-image" : ""} ${isCopied ? "copied" : ""} ${pinnedClipIds.has(item.id) ? "is-pinned" : ""}`}
 																			onClick={async (e) => {
 																				e.stopPropagation();
 																				try {
@@ -5173,6 +5316,14 @@ function App() {
 																				</span>
 																			) : (
 																				<div className="clip-cell-actions">
+																					<button
+																						type="button"
+																						className={`clip-cell-pin ${pinnedClipIds.has(item.id) ? "is-pinned" : ""}`}
+																						title={pinnedClipIds.has(item.id) ? "Unpin snippet" : "Pin snippet"}
+																						onClick={(e) => togglePinClip(item.id, e)}
+																					>
+																						<Pin size={10} strokeWidth={2.5} />
+																					</button>
 																					{isImage && (
 																						<button
 																							type="button"

@@ -324,6 +324,12 @@ function SettingsApp() {
 							handleRemoveDockExtraFolder={settings.handleRemoveDockExtraFolder}
 							startIcon={settings.startIcon}
 							handleStartIconChange={settings.handleStartIconChange}
+							dockMaterial={settings.dockMaterial}
+							handleDockMaterialChange={settings.handleDockMaterialChange}
+							dockIconTheme={settings.dockIconTheme}
+							handleDockIconThemeChange={settings.handleDockIconThemeChange}
+							dockDownloadsEnabled={settings.dockDownloadsEnabled}
+							toggleDockDownloads={settings.toggleDockDownloads}
 						/>
 					)}
 					{activeTab === "overlays" && (

@@ -19,7 +19,10 @@ import {
 	FolderOpen,
 	FolderPlus,
 	Plus,
-	X
+	X,
+	Layers,
+	Palette,
+	DownloadCloud
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import {
@@ -138,6 +141,12 @@ interface DockTabProps {
 	handleRemoveDockExtraFolder: (path: string) => void;
 	startIcon: string;
 	handleStartIconChange: (icon: string) => void;
+	dockMaterial: string;
+	handleDockMaterialChange: (material: string) => void;
+	dockIconTheme: string;
+	handleDockIconThemeChange: (theme: string) => void;
+	dockDownloadsEnabled: boolean;
+	toggleDockDownloads: () => void;
 }
 
 export function DockTab({
@@ -175,7 +184,13 @@ export function DockTab({
 	handleAddDockExtraFolder,
 	handleRemoveDockExtraFolder,
 	startIcon,
-	handleStartIconChange
+	handleStartIconChange,
+	dockMaterial,
+	handleDockMaterialChange,
+	dockIconTheme,
+	handleDockIconThemeChange,
+	dockDownloadsEnabled,
+	toggleDockDownloads
 }: DockTabProps) {
 	const handleStartIconUpload = (e: ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
@@ -249,6 +264,55 @@ export function DockTab({
 						<SettingRow icon={Circle} label="Icon Only" desc="Remove icon background and padding">
 							<label className="toggle-switch">
 								<input type="checkbox" checked={dockIconOnly} onChange={toggleDockIconOnly} />
+								<span className="slider"></span>
+							</label>
+						</SettingRow>
+
+						<SettingRow
+							icon={Layers}
+							label="Backdrop Material"
+							desc="Choose the blur material and depth styling"
+						>
+							<select
+								className="settings-select"
+								value={dockMaterial}
+								onChange={(e) => handleDockMaterialChange(e.target.value)}
+							>
+								<option value="glass">Glass (Default)</option>
+								<option value="acrylic">Frosted Acrylic</option>
+								<option value="mica">Mica Slate</option>
+								<option value="solid">Deep Solid</option>
+							</select>
+						</SettingRow>
+
+						<SettingRow
+							icon={Palette}
+							label="Icon Pack Theme"
+							desc="Styling and filter theme applied to dock icons"
+						>
+							<select
+								className="settings-select"
+								value={dockIconTheme}
+								onChange={(e) => handleDockIconThemeChange(e.target.value)}
+							>
+								<option value="native">Native (Default)</option>
+								<option value="squircle">macOS Squircle</option>
+								<option value="neon">Cyber Neon Glow</option>
+								<option value="monochrome">Monochrome Minimal</option>
+							</select>
+						</SettingRow>
+
+						<SettingRow
+							icon={DownloadCloud}
+							label="Downloads Progress Hub"
+							desc="Track ongoing file downloads in real-time on the left dock"
+						>
+							<label className="toggle-switch">
+								<input
+									type="checkbox"
+									checked={dockDownloadsEnabled}
+									onChange={toggleDockDownloads}
+								/>
 								<span className="slider"></span>
 							</label>
 						</SettingRow>

@@ -20,6 +20,8 @@ import {
 import { driveLetter, hideDrive, removeCustomFolder, type DockExtra } from "./dockExtras";
 import { FolderStackPopover } from "./components/FolderStackPopover";
 import { createRegionSender, measureElements, padRect, type RegionRect } from "./windowRegion";
+import { ArrowDown } from "lucide-react";
+import { DownloadHubPopover, type DownloadProgressSummary, formatSpeed } from "./components/DownloadHubPopover";
 
 // Host processes (Edge/Chrome/Brave/ApplicationFrameHost) run every PWA/UWP
 // window, so their window title must be part of their identity — otherwise two
@@ -234,6 +236,7 @@ const Dock = memo(function Dock() {
 		() => localStorage.getItem("bloom-dock-search-enabled") !== "false"
 	);
 	const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+	const [hotkeyRevealed, setHotkeyRevealed] = useState(false);
 	const [dockTaskView, setDockTaskView] = useState(
 		() => localStorage.getItem("bloom-dock-task-view") === "true"
 	);
@@ -282,6 +285,20 @@ const Dock = memo(function Dock() {
 		anchorX: number;
 	} | null>(null);
 	const folderStackRef = useRef<HTMLDivElement | null>(null);
+	const [dockMaterial, setDockMaterial] = useState(
+		() => localStorage.getItem("bloom-dock-material") || "glass"
+	);
+	const [dockIconTheme, setDockIconTheme] = useState(
+		() => localStorage.getItem("bloom-dock-icon-theme") || "native"
+	);
+	const [dockDownloadsEnabled, setDockDownloadsEnabled] = useState(
+		() => localStorage.getItem("bloom-dock-downloads-enabled") !== "false"
+	);
+	const [downloadSummary, setDownloadSummary] = useState<DownloadProgressSummary | null>(null);
+	const [showDownloadHub, setShowDownloadHub] = useState(false);
+	const downloadHubAnchorRef = useRef<HTMLDivElement | null>(null);
+	const downloadHubPopoverRef = useRef<HTMLDivElement | null>(null);
+	const [downloadHubAnchorX, setDownloadHubAnchorX] = useState(0);
 	const [, setRegionTick] = useState(0);
 	const [springAppId, setSpringAppId] = useState<string | null>(null);
 	const springAppIdRef = useRef<string | null>(null);
@@ -308,16 +325,23 @@ const Dock = memo(function Dock() {
 	// behind the pill (which paints above it), so the seam stays fused even
 	// if the measurement is off by a few px at some scale.
 	useEffect(() => {
-		if (showAddPopup || activeFolderStack) {
+		if (showAddPopup || activeFolderStack || showDownloadHub) {
 			const h = dockRef.current?.getBoundingClientRect().height ?? 0;
 			if (h > 0) setPopupBottom(h / (scale || 1) - 14);
 		}
-	}, [showAddPopup, activeFolderStack, scale]);
+	}, [showAddPopup, activeFolderStack, showDownloadHub, scale]);
 
 	const isCurrentlyHovered = isDockHovered || isEdgeHovered;
 	const [interactionState, setInteractionState] = useState<"active" | "grace" | "none">("none");
 	const isAnyInteraction =
-		isCurrentlyHovered || !!contextMenu || showAddPopup || nativeMenuOpen || !!activeFolderStack;
+		isCurrentlyHovered ||
+		!!contextMenu ||
+		showAddPopup ||
+		nativeMenuOpen ||
+		!!activeFolderStack ||
+		showDownloadHub ||
+		isSearchExpanded ||
+		hotkeyRevealed;
 
 	const previewTimerRef = useRef<any>(null);
 	const isPreviewHoveredRef = useRef(false);
@@ -537,6 +561,17 @@ const Dock = memo(function Dock() {
 			setWaveCrestX(null);
 		});
 
+		const unlistenHotkeyToggle = listen("dock-toggle-hotkey", () => {
+			setHotkeyRevealed((prev) => !prev);
+		});
+
+		const unlistenDownloads = listen<DownloadProgressSummary>("downloads-update", (event) => {
+			setDownloadSummary(event.payload);
+		});
+		invoke<DownloadProgressSummary>("get_download_summary")
+			.then(setDownloadSummary)
+			.catch(() => {});
+
 		return () => {
 			unlistenOverlap.then((f) => f());
 			unlistenInstalledApps.then((f) => f());
@@ -545,6 +580,8 @@ const Dock = memo(function Dock() {
 			unlistenMaximized.then((f) => f());
 			unlistenSearchOpen.then((f) => f());
 			unlistenSearchClose.then((f) => f());
+			unlistenHotkeyToggle.then((f) => f());
+			unlistenDownloads.then((f) => f());
 		};
 	}, []);
 
@@ -559,6 +596,9 @@ const Dock = memo(function Dock() {
 		"bloom-dock-task-view": setDockTaskView,
 		"bloom-start-icon": setStartIcon,
 		"bloom-scale": setScale,
+		"bloom-dock-material": setDockMaterial,
+		"bloom-dock-icon-theme": setDockIconTheme,
+		"bloom-dock-downloads-enabled": (val) => setDockDownloadsEnabled(val !== "false"),
 		"bloom-dock-extras-position": setDockExtrasPosition,
 		"bloom-dock-extras-drives": () => setDockExtrasRevision((r) => r + 1),
 		"bloom-dock-extras-recycle-bin": () => setDockExtrasRevision((r) => r + 1),
@@ -1149,6 +1189,7 @@ const Dock = memo(function Dock() {
 			setShowAddPopup(false);
 			setIsSearchExpanded(false);
 			setActiveFolderStack(null);
+			setShowDownloadHub(false);
 		});
 		return () => {
 			unlisten.then((f) => f());
@@ -1213,7 +1254,8 @@ const Dock = memo(function Dock() {
 				[".context-menu", 34],
 				[".submenu", 34],
 				[".dock-toast", 20],
-				[".folder-stack-popover", 40]
+				[".folder-stack-popover", 40],
+				[".download-hub-popover", 40]
 			])
 		);
 		// The Add App popup grows from scaleY 0, and that animation doesn't
@@ -1243,6 +1285,24 @@ const Dock = memo(function Dock() {
 		const folderStack = folderStackRef.current;
 		if (folderStack) {
 			const p = folderStack.getBoundingClientRect();
+			wanted.push(padRect({ x: p.left, y: p.top, width: p.width, height: p.height }, 40));
+		}
+		if (showDownloadHub) {
+			const popoverWidth = 360 * scale;
+			const popoverHeight = 380 * scale;
+			const idealLeft = downloadHubAnchorX - popoverWidth / 2;
+			const left = Math.max(16, Math.min(idealLeft, window.innerWidth - popoverWidth - 16));
+			const top = Math.max(10, window.innerHeight - (popupBottom + 20) * scale - popoverHeight);
+			wanted.push({
+				x: Math.round(left) - 20,
+				y: Math.round(top) - 20,
+				width: Math.round(popoverWidth) + 40,
+				height: Math.round(popoverHeight) + 40
+			});
+		}
+		const downloadHub = downloadHubPopoverRef.current;
+		if (downloadHub) {
+			const p = downloadHub.getBoundingClientRect();
 			wanted.push(padRect({ x: p.left, y: p.top, width: p.width, height: p.height }, 40));
 		}
 		sendDockRegion(wanted);
@@ -1283,6 +1343,29 @@ const Dock = memo(function Dock() {
 				const popoverWidth = 360 * scale;
 				const popoverHeight = 400 * scale;
 				const idealLeft = activeFolderStack.anchorX - popoverWidth / 2;
+				const left = Math.max(16, Math.min(idealLeft, window.innerWidth - popoverWidth - 16));
+				const top = Math.max(10, window.innerHeight - (popupBottom + 20) * scale - popoverHeight);
+				rect = {
+					x: Math.round(left),
+					y: Math.round(top),
+					width: Math.round(popoverWidth),
+					height: Math.round(popoverHeight)
+				};
+			}
+			open = true;
+		} else if (showDownloadHub) {
+			if (downloadHubPopoverRef.current) {
+				const r = downloadHubPopoverRef.current.getBoundingClientRect();
+				rect = {
+					x: Math.round(r.x) - 10,
+					y: Math.round(r.y) - 10,
+					width: Math.round(r.width) + 20,
+					height: Math.round(r.height) + 20
+				};
+			} else {
+				const popoverWidth = 360 * scale;
+				const popoverHeight = 380 * scale;
+				const idealLeft = downloadHubAnchorX - popoverWidth / 2;
 				const left = Math.max(16, Math.min(idealLeft, window.innerWidth - popoverWidth - 16));
 				const top = Math.max(10, window.innerHeight - (popupBottom + 20) * scale - popoverHeight);
 				rect = {
@@ -1459,6 +1542,9 @@ const Dock = memo(function Dock() {
 		if (dockTaskView) keys.push("task-view");
 		if (dockExtrasPosition === "left") {
 			dockExtras.forEach((e) => keys.push(e.id));
+			if (dockDownloadsEnabled) keys.push("downloads-hub");
+		} else if (dockDownloadsEnabled) {
+			keys.push("downloads-hub");
 		}
 		pinnedItems.forEach((p) => keys.push(itemKey(p)));
 		unpinnedItems.forEach((u) => keys.push(itemKey(u)));
@@ -1466,7 +1552,7 @@ const Dock = memo(function Dock() {
 			dockExtras.forEach((e) => keys.push(e.id));
 		}
 		return keys;
-	}, [startItem, dockSearchEnabled, isSearchExpanded, dockTaskView, pinnedItems, unpinnedItems, dockExtras, dockExtrasPosition]);
+	}, [startItem, dockSearchEnabled, isSearchExpanded, dockTaskView, pinnedItems, unpinnedItems, dockExtras, dockExtrasPosition, dockDownloadsEnabled]);
 
 	const [dockWidth, setDockWidth] = useState(0);
 	const [waveCrestX, setWaveCrestX] = useState<number | null>(null);
@@ -1785,6 +1871,64 @@ const Dock = memo(function Dock() {
 		</motion.div>
 	);
 
+	const renderDownloadHubIcon = () => {
+		if (!dockDownloadsEnabled) return null;
+		const hasActive = (downloadSummary?.active_count ?? 0) > 0;
+		const activeCount = downloadSummary?.active_count ?? 0;
+		const totalSpeed = downloadSummary?.total_speed_bps ?? 0;
+		const tooltipText = hasActive
+			? `Downloading: ${activeCount} file${activeCount === 1 ? "" : "s"} (${formatSpeed(totalSpeed)})`
+			: "Downloads Hub";
+
+		return (
+			<motion.div
+				key="downloads-hub"
+				layout
+				ref={downloadHubAnchorRef}
+				initial={{ opacity: 0, scale: 0 }}
+				animate={{ opacity: 1, scale: 1 }}
+				exit={{ opacity: 0, scale: 0, transition: { duration: 0.12 } }}
+				className="dock-icon-wrapper"
+				data-app-id="downloads-hub"
+				onMouseEnter={() => setHoveredApp("downloads-hub")}
+				onMouseLeave={() => {
+					setHoveredApp(null);
+					setPressedApp(null);
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					if (downloadHubAnchorRef.current) {
+						const r = downloadHubAnchorRef.current.getBoundingClientRect();
+						setDownloadHubAnchorX(r.left + r.width / 2);
+					}
+					setShowDownloadHub((prev) => !prev);
+					setActiveFolderStack(null);
+					setContextMenu(null);
+					setShowAddPopup(false);
+				}}
+			>
+				{hoveredApp === "downloads-hub" && <div className="tooltip">{tooltipText}</div>}
+				<motion.div
+					className={`dock-icon dock-download-hub-icon ${hasActive ? "is-downloading" : ""}`}
+					animate={getWaveTransform("downloads-hub")}
+					transition={waveTransition}
+					onPointerDown={() => setPressedApp("downloads-hub")}
+					onPointerUp={() => setPressedApp(null)}
+					onPointerCancel={() => setPressedApp(null)}
+				>
+					<div className="download-hub-icon-inner">
+						<ArrowDown size={20} className={hasActive ? "download-arrow-anim" : ""} />
+						{hasActive && (
+							<span className="download-hub-badge-count">
+								{activeCount}
+							</span>
+						)}
+					</div>
+				</motion.div>
+			</motion.div>
+		);
+	};
+
 	return (
 		<div className={`dock-container ${isDragging ? "dragging" : ""}`} onClick={closeMenu}>
 			<div
@@ -1799,7 +1943,7 @@ const Dock = memo(function Dock() {
 				<motion.div
 					ref={dockRef}
 					layout
-					className={`dock ${isExpanded && !isHidden ? "dock-expanded" : ""} ${isImpacted && !isExpanded && !isHidden ? "dock-impacted" : ""} ${dockIconOnly ? "dock-icon-only" : ""} ${isAdaptive ? "dock-adaptive" : ""}`}
+					className={`dock ${isExpanded && !isHidden ? "dock-expanded" : ""} ${isImpacted && !isExpanded && !isHidden ? "dock-impacted" : ""} ${dockIconOnly ? "dock-icon-only" : ""} ${isAdaptive ? "dock-adaptive" : ""} dock-material-${dockMaterial} dock-theme-${dockIconTheme}`}
 					onMouseEnter={() => setIsDockHovered(true)}
 					onMouseLeave={() => {
 						setIsDockHovered(false);
@@ -1995,11 +2139,24 @@ const Dock = memo(function Dock() {
 								{dockExtrasPosition === "left" && dockExtras.length > 0 && (
 									<>
 										{dockExtras.map((extra) => renderExtra(extra))}
+										{renderDownloadHubIcon()}
 										<div
 											className="dock-app-divider"
 											role="separator"
 											aria-orientation="vertical"
 										/>
+									</>
+								)}
+								{(!dockExtras.length || dockExtrasPosition !== "left") && (
+									<>
+										{renderDownloadHubIcon()}
+										{dockDownloadsEnabled && (
+											<div
+												className="dock-app-divider"
+												role="separator"
+												aria-orientation="vertical"
+											/>
+										)}
 									</>
 								)}
 
@@ -2722,6 +2879,26 @@ const Dock = memo(function Dock() {
 							invoke("open_dock_extra", { kind: "folder", path }).catch(showActionError)
 						}
 						onLayoutChange={() => setRegionTick((t) => t + 1)}
+					/>
+				)}
+			</AnimatePresence>
+
+			<AnimatePresence>
+				{showDownloadHub && (
+					<DownloadHubPopover
+						popoverRef={downloadHubPopoverRef}
+						summary={
+							downloadSummary ?? {
+								active_count: 0,
+								total_speed_bps: 0,
+								active_downloads: [],
+								recent_completed: []
+							}
+						}
+						anchorX={downloadHubAnchorX}
+						scale={scale}
+						bottomOffset={popupBottom}
+						onClose={() => setShowDownloadHub(false)}
 					/>
 				)}
 			</AnimatePresence>

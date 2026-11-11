@@ -660,34 +660,56 @@ pub fn is_start_menu_open() -> bool {
         OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
         PROCESS_QUERY_LIMITED_INFORMATION,
     };
-    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        FindWindowW, GetForegroundWindow, GetWindowThreadProcessId, IsWindowVisible,
+    };
 
     unsafe {
         let fg = GetForegroundWindow();
-        if fg.0.is_null() {
-            return false;
-        }
-        let mut pid = 0u32;
-        GetWindowThreadProcessId(fg, Some(&mut pid));
-        if pid == 0 {
-            return false;
-        }
-        if let Ok(process) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
-            let mut buf = [0u16; 260];
-            let mut len = buf.len() as u32;
-            let ok = QueryFullProcessImageNameW(
-                process,
-                PROCESS_NAME_WIN32,
-                windows::core::PWSTR(buf.as_mut_ptr()),
-                &mut len,
-            );
-            let _ = CloseHandle(process);
-            if ok.is_ok() {
-                let path = String::from_utf16_lossy(&buf[..len as usize]);
-                let file = path.rsplit('\\').next().unwrap_or("").to_lowercase();
-                return file == "startmenuexperiencehost.exe" || file == "searchhost.exe";
+        if !fg.0.is_null() {
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(fg, Some(&mut pid));
+            if pid != 0 {
+                if let Ok(process) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+                    let mut buf = [0u16; 260];
+                    let mut len = buf.len() as u32;
+                    let ok = QueryFullProcessImageNameW(
+                        process,
+                        PROCESS_NAME_WIN32,
+                        windows::core::PWSTR(buf.as_mut_ptr()),
+                        &mut len,
+                    );
+                    let _ = CloseHandle(process);
+                    if ok.is_ok() {
+                        let path = String::from_utf16_lossy(&buf[..len as usize]);
+                        let file = path.rsplit('\\').next().unwrap_or("").to_lowercase();
+                        if file == "startmenuexperiencehost.exe" || file == "searchhost.exe" {
+                            return true;
+                        }
+                    }
+                }
             }
         }
+
+        // Secondary check: Is Start or Search CoreWindow currently open and visible?
+        if let Ok(start_wnd) = FindWindowW(
+            windows::core::w!("Windows.UI.Core.CoreWindow"),
+            windows::core::w!("Start"),
+        ) {
+            if !start_wnd.0.is_null() && IsWindowVisible(start_wnd).as_bool() {
+                return true;
+            }
+        }
+
+        if let Ok(search_wnd) = FindWindowW(
+            windows::core::w!("Windows.UI.Core.CoreWindow"),
+            windows::core::w!("Search"),
+        ) {
+            if !search_wnd.0.is_null() && IsWindowVisible(search_wnd).as_bool() {
+                return true;
+            }
+        }
+
         false
     }
 }

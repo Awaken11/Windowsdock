@@ -142,6 +142,15 @@ export function useSettings() {
 	const [dockExtrasCustomFolders, setDockExtrasCustomFolders] = useState(
 		() => localStorage.getItem("bloom-dock-extras-custom-folders") || "[]"
 	);
+	const [dockMaterial, setDockMaterial] = useState(
+		() => localStorage.getItem("bloom-dock-material") || "glass"
+	);
+	const [dockIconTheme, setDockIconTheme] = useState(
+		() => localStorage.getItem("bloom-dock-icon-theme") || "native"
+	);
+	const [dockDownloadsEnabled, setDockDownloadsEnabled] = useState(
+		() => localStorage.getItem("bloom-dock-downloads-enabled") !== "false"
+	);
 	const [dockMode, setDockMode] = useState(() => {
 		// "smart" is the fresh-install default — keep in step with App.tsx,
 		// Dock.tsx, and the backend fallback in commands.rs.
@@ -251,6 +260,9 @@ export function useSettings() {
 			apply(getVal("bloom-dock-extras-hidden-drives"), setDockExtrasHiddenDrives, (v) => v);
 			apply(getVal("bloom-dock-extras-folders"), setDockExtrasFolders, (v) => v);
 			apply(getVal("bloom-dock-extras-custom-folders"), setDockExtrasCustomFolders, (v) => v);
+			apply(getVal("bloom-dock-material"), setDockMaterial, (v) => v);
+			apply(getVal("bloom-dock-icon-theme"), setDockIconTheme, (v) => v);
+			apply(getVal("bloom-dock-downloads-enabled"), setDockDownloadsEnabled, (v) => v !== "false");
 
 			apply(getVal("bloom-temp-unit"), setTempUnitFahrenheit, (v) => v === "fahrenheit");
 			apply(getVal("bloom-scale"), setScale, parseFloat);
@@ -396,6 +408,9 @@ export function useSettings() {
 		"bloom-dock-extras-hidden-drives": setDockExtrasHiddenDrives,
 		"bloom-dock-extras-folders": setDockExtrasFolders,
 		"bloom-dock-extras-custom-folders": setDockExtrasCustomFolders,
+		"bloom-dock-material": setDockMaterial,
+		"bloom-dock-icon-theme": setDockIconTheme,
+		"bloom-dock-downloads-enabled": setDockDownloadsEnabled,
 		"bloom-weather-enabled": setWeatherEnabled,
 		"bloom-calendar-enabled": setCalendarEnabled,
 		"bloom-calendar-monday-first": setCalendarMondayFirst,
@@ -800,6 +815,22 @@ export function useSettings() {
 		saveSetting("bloom-dock-extras-custom-folders", next);
 	};
 
+	const handleDockMaterialChange = (material: string) => {
+		setDockMaterial(material);
+		saveSetting("bloom-dock-material", material);
+	};
+
+	const handleDockIconThemeChange = (theme: string) => {
+		setDockIconTheme(theme);
+		saveSetting("bloom-dock-icon-theme", theme);
+	};
+
+	const toggleDockDownloads = () => {
+		const next = !dockDownloadsEnabled;
+		setDockDownloadsEnabled(next);
+		saveSetting("bloom-dock-downloads-enabled", String(next));
+	};
+
 	const toggleAutoUpdate = () => {
 		const next = !autoUpdate;
 		setAutoUpdate(next);
@@ -1112,6 +1143,12 @@ export function useSettings() {
 		dockExtrasCustomFolders,
 		handleAddDockExtraFolder,
 		handleRemoveDockExtraFolder,
+		dockMaterial,
+		handleDockMaterialChange,
+		dockIconTheme,
+		handleDockIconThemeChange,
+		dockDownloadsEnabled,
+		toggleDockDownloads,
 
 		// Overlays
 		volumeOverlayEnabled,

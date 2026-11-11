@@ -22,6 +22,7 @@ mod window_region;
 mod dock_drop;
 mod clipboard;
 mod notifications;
+mod downloads;
 
 use std::sync::atomic::Ordering;
 use tauri::Manager;
@@ -237,10 +238,13 @@ fn main() {
             clipboard::remove_clipboard_item,
             clipboard::copy_clipboard_item,
             notifications::dismiss_notification,
-            notifications::focus_notification_app
+            notifications::focus_notification_app,
+            downloads::get_download_summary,
+            downloads::open_download_file
         ])
         .setup(|app| {
             clipboard::start_clipboard_monitor(app.handle().clone());
+            downloads::start_download_monitor(app.handle().clone());
             init_taskbar_marker(app.handle());
             // Migrate legacy Bloom settings and state if this is first launch of Awaken
             crate::utils::migrate_legacy_data(app.handle());

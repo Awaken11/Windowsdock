@@ -1837,6 +1837,41 @@ img {
 	transition: background 0.1s ease, color 0.1s ease;
 }
 
+.clip-cell-pin {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	border-radius: 4px;
+	border: none;
+	background: rgba(255, 255, 255, 0.12);
+	color: rgba(255, 255, 255, 0.7);
+	cursor: pointer;
+	padding: 0;
+	transition: background 0.1s ease, color 0.1s ease;
+}
+
+.clip-cell:hover .clip-cell-pin,
+.clip-cell-pin.is-pinned {
+	display: flex;
+}
+
+.clip-cell-pin.is-pinned {
+	background: rgba(234, 179, 8, 0.25);
+	color: #facc15;
+}
+
+.clip-cell.is-pinned {
+	border-color: rgba(234, 179, 8, 0.35);
+	background: rgba(234, 179, 8, 0.08);
+}
+
+.clip-cell-pin:hover {
+	background: rgba(234, 179, 8, 0.4);
+	color: #fef08a;
+}
+
 .clip-cell:hover .clip-cell-zoom {
 	display: flex;
 }
@@ -2060,6 +2095,101 @@ img {
 	opacity: 0.55;
 	border: 1px dashed rgba(255, 255, 255, 0.25);
 	border-radius: 12px;
+}
+
+/* ── Shelf Scratchpad Markdown Notes ── */
+.shelf-scratchpad-view {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	height: calc(100% - 32px);
+	min-height: 190px;
+	box-sizing: border-box;
+}
+
+.shelf-scratchpad-textarea {
+	width: 100%;
+	flex: 1;
+	background: rgba(0, 0, 0, 0.25);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 8px;
+	padding: 8px 10px;
+	color: #f1f5f9;
+	font-size: 12px;
+	line-height: 1.5;
+	font-family: inherit;
+	resize: none;
+	outline: none;
+	box-sizing: border-box;
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.shelf-scratchpad-textarea:focus {
+	border-color: rgba(56, 189, 248, 0.5);
+	background: rgba(0, 0, 0, 0.35);
+}
+
+.shelf-scratchpad-textarea::placeholder {
+	color: rgba(255, 255, 255, 0.35);
+}
+
+.shelf-scratchpad-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 2px 2px 2px;
+	font-size: 10.5px;
+	color: rgba(255, 255, 255, 0.5);
+}
+
+.shelf-scratchpad-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.shelf-scratchpad-btn {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 6px;
+	padding: 3px 8px;
+	font-size: 10.5px;
+	color: rgba(255, 255, 255, 0.75);
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.shelf-scratchpad-btn:hover {
+	background: rgba(255, 255, 255, 0.15);
+	color: #fff;
+}
+
+.shelf-scratchpad-btn.primary {
+	background: rgba(56, 189, 248, 0.2);
+	border-color: rgba(56, 189, 248, 0.4);
+	color: #7dd3fc;
+}
+
+.shelf-scratchpad-btn.primary:hover {
+	background: rgba(56, 189, 248, 0.3);
+	color: #bae6fd;
+}
+
+.shelf-scratchpad-btn.copied {
+	background: rgba(16, 185, 129, 0.25);
+	border-color: rgba(16, 185, 129, 0.5);
+	color: #6ee7b7;
+}
+
+.shelf-notes-dot {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: #38bdf8;
+	margin-left: 2px;
 }
 
 .shelf-notice {
