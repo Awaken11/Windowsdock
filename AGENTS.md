@@ -24,7 +24,7 @@ Run from the repo root unless noted. Bun 1.4.0, Rust stable.
 
 ## Settings
 
-- Stored in `%APPDATA%/bloom/settings.json` as a flat object of `bloom-`-prefixed keys; all values are strings (`"true"`/`"false"` for booleans). `SETTINGS.md` documents every key
+- Stored in `%APPDATA%/com.akhil.awaken/settings.json` (migrated from legacy `%APPDATA%/bloom/settings.json`) as a flat object of `bloom-`-prefixed keys; all values are strings (`"true"`/`"false"` for booleans). `SETTINGS.md` documents every key
 - UI write path: set `localStorage`, then `invoke("save_setting")` → backend caches it and emits `settings-changed`. External file edits are watched and emitted as `settings-external-changed`
 - `src/hooks/useSettingsSync.ts` is the single sync hook for both events and normalizes string booleans/numbers
 - The CSP in `tauri.conf.json` allow-lists network origins (weather APIs only); add new origins there. New Tauri plugins also need permissions in `capabilities/default.json`

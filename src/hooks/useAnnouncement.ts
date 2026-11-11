@@ -10,7 +10,7 @@ export interface Announcement {
 	url?: string;
 }
 
-const ENDPOINT = "https://bloom.sehaz.space/announcements.json";
+const ENDPOINT = "https://raw.githubusercontent.com/Awaken11/Windowsdock/main/announcements.json";
 const CACHE_KEY = "bloom-announcement-cache";
 const CACHE_AT_KEY = "bloom-announcement-cache-at";
 const DISMISSED_KEY = "bloom-announcement-dismissed";

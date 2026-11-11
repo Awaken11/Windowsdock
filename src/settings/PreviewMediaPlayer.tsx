@@ -12,9 +12,9 @@ import {
 } from "../icons";
 
 const TRACKS = [
-	{ title: "Sample track", artist: "Bloom preview" },
-	{ title: "Next track", artist: "Bloom preview" },
-	{ title: "Another track", artist: "Bloom preview" }
+	{ title: "Sample track", artist: "Awaken preview" },
+	{ title: "Next track", artist: "Awaken preview" },
+	{ title: "Another track", artist: "Awaken preview" }
 ];
 
 function formatTime(seconds: number) {
