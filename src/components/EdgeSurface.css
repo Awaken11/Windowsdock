@@ -84,13 +84,11 @@
 	right: 13px;
 }
 
-.edge-surface--bottom,
 .edge-surface--bottom::before {
 	border-top-left-radius: 18px !important;
 	border-top-right-radius: 18px !important;
 }
 
-.edge-surface--top,
 .edge-surface--top::before {
 	border-bottom-left-radius: 18px !important;
 	border-bottom-right-radius: 18px !important;

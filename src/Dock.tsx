@@ -171,7 +171,7 @@ function resolveStartIcon(startIcon: string): string {
 	if (startIcon === "bloom-biscuit") return "/bloom-biscuit.png";
 	if (startIcon === "windows") return "/windows-11.png";
 	if (startIcon.startsWith("custom:")) return startIcon.slice("custom:".length);
-	return "/bloom.png";
+	return "/awaken.png";
 }
 
 // Stable module-level constants so object references never change between renders,

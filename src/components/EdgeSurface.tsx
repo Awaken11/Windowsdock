@@ -108,16 +108,20 @@ export function EdgeSurface({ edge, flares = true, reflective = false, wave }: E
 				path += ` L ${left} ${topOffset + rl}`;
 
 				const hasWave = H > 0.05 && crestX !== null && xEnd > xStart + 24;
+				const k = 0.5522847;
 				if (!hasWave) {
-					path += rl > 0 ? ` A ${rl} ${rl} 0 0 1 ${xStart} ${topOffset}` : ` L ${left} ${topOffset}`;
+					path += rl > 0
+						? ` C ${left} ${(topOffset + rl - rl * k).toFixed(1)}, ${(xStart - rl * k).toFixed(1)} ${topOffset}, ${xStart} ${topOffset}`
+						: ` L ${left} ${topOffset}`;
 					path += ` L ${xEnd.toFixed(1)} ${topOffset}`;
-					path += rr > 0 ? ` A ${rr} ${rr} 0 0 1 ${right} ${topOffset + rr}` : ` L ${right} ${topOffset}`;
+					path += rr > 0
+						? ` C ${(xEnd + rr * k).toFixed(1)} ${topOffset}, ${right} ${(topOffset + rr - rr * k).toFixed(1)}, ${right} ${(topOffset + rr).toFixed(1)}`
+						: ` L ${right} ${topOffset}`;
 				} else {
 					// crestX from dock is relative to the dock element (left edge = 0).
 					// In EdgeSurface, the dock left edge sits at x = left (13px), so offset by left.
 					const surfaceCrestX = Math.max(xStart - 10, Math.min(xEnd + 10, crestX + left));
 					const W = 115;
-					const k = 0.5522847;
 
 					// Left edge interaction
 					const dxLeft = surfaceCrestX - xStart;
@@ -147,13 +151,13 @@ export function EdgeSurface({ edge, flares = true, reflective = false, wave }: E
 					const yStart = topOffset - hStart;
 					const dyLeft = rl + hStart;
 					let leftCorner = "";
-					if (hStart > 0.05 && rl > 0) {
+					if (rl > 0) {
 						const p1_y = topOffset + rl - dyLeft * k;
 						const p2_x = xStart - rl * k;
 						const p2_y = yStart - slopeStart * (rl * k);
 						leftCorner = ` C ${left} ${p1_y.toFixed(1)}, ${p2_x.toFixed(1)} ${p2_y.toFixed(1)}, ${xStart} ${yStart.toFixed(1)}`;
 					} else {
-						leftCorner = rl > 0 ? ` A ${rl} ${rl} 0 0 1 ${xStart} ${topOffset}` : ` L ${left} ${topOffset}`;
+						leftCorner = ` L ${left} ${yStart.toFixed(1)}`;
 					}
 					path += leftCorner;
 
@@ -193,13 +197,13 @@ export function EdgeSurface({ edge, flares = true, reflective = false, wave }: E
 					// 6. Right corner arc / blend
 					const dyRight = rr + hEnd;
 					let rightCorner = "";
-					if (hEnd > 0.05 && rr > 0) {
+					if (rr > 0) {
 						const p1_x = xEnd + rr * k;
 						const p1_y = yEnd + slopeEnd * (rr * k);
 						const p2_y = topOffset + rr - dyRight * k;
 						rightCorner = ` C ${p1_x.toFixed(1)} ${p1_y.toFixed(1)}, ${right} ${p2_y.toFixed(1)}, ${right} ${(topOffset + rr).toFixed(1)}`;
 					} else {
-						rightCorner = rr > 0 ? ` A ${rr} ${rr} 0 0 1 ${right} ${(topOffset + rr).toFixed(1)}` : ` L ${right} ${topOffset}`;
+						rightCorner = ` L ${right} ${yEnd.toFixed(1)}`;
 					}
 					path += rightCorner;
 

@@ -3410,10 +3410,10 @@ function App() {
 		}
 		if (bloomMode === "notifications") {
 			if (notificationHistory.length === 0) return 170;
-			if (notificationHistory.length === 1) return 160;
-			if (notificationHistory.length === 2) return 235;
-			if (notificationHistory.length === 3) return 315;
-			return 390;
+			if (notificationHistory.length === 1) return 165;
+			if (notificationHistory.length === 2) return 255;
+			if (notificationHistory.length === 3) return 345;
+			return 420;
 		}
 		// Sized to the calendar's week-row count plus the timer's fixed content.
 		if (bloomMode === "calendar") return 112 + calendarRows(calendarMonth, calendarMondayFirst) * 30;
