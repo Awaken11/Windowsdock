@@ -4036,13 +4036,25 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                 return true.into();
             }
 
-            // Filter out system containers and background stuff
-            if title == "Program Manager" || title == "Bloom" || title == "Bloom Dock" {
+            let mut process_id = 0u32;
+            GetWindowThreadProcessId(hwnd, Some(&mut process_id));
+
+            // Never include Awaken's own windows or current process
+            if process_id != 0 && process_id == std::process::id() {
                 return true.into();
             }
 
-            let mut process_id = 0u32;
-            GetWindowThreadProcessId(hwnd, Some(&mut process_id));
+            // Filter out system containers and background stuff
+            if title == "Program Manager"
+                || title == "Bloom"
+                || title == "Bloom Dock"
+                || title == "Awaken"
+                || title == "Awaken Dock"
+                || title == "Awaken App Switcher"
+                || title == "Awaken Settings"
+            {
+                return true.into();
+            }
 
             if let Ok(process_handle) =
                 OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id)

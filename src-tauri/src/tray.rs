@@ -118,6 +118,16 @@ fn is_explorer_hosted_icon(path: &str) -> bool {
         .is_some_and(|name| name.to_string_lossy().eq_ignore_ascii_case("explorer.exe"))
 }
 
+// Awaken creates its own system tray icon; it must never appear as a tray app on its own dock.
+fn is_self_hosted_icon(path: &str) -> bool {
+    std::path::Path::new(path)
+        .file_name()
+        .is_some_and(|name| {
+            let n = name.to_string_lossy();
+            n.eq_ignore_ascii_case("awaken.exe") || n.eq_ignore_ascii_case("bloom.exe")
+        })
+}
+
 /// The overflow chevron ("Show hidden icons"). Its name is localized, so it is
 /// identified by AutomationId and class: the other system buttons sharing the
 /// `SystemTrayIcon` id (network, volume, clock) use different classes.
@@ -242,9 +252,10 @@ pub fn enumerate() -> Vec<TrayApp> {
         let mut apps: HashMap<String, TrayApp> = HashMap::new();
         // Explorer-hosted system icons still occupy overflow positions, so
         // live_icons keeps them for interact(); they just aren't app trays.
+        // Awaken's own tray icon is also filtered out so it doesn't appear on its own dock.
         for icon in live_icons(&windows, false)
             .into_iter()
-            .filter(|icon| !is_explorer_hosted_icon(&icon.path))
+            .filter(|icon| !is_explorer_hosted_icon(&icon.path) && !is_self_hosted_icon(&icon.path))
         {
             let app = apps
                 .entry(icon.path.to_lowercase())

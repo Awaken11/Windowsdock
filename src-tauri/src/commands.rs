@@ -750,10 +750,14 @@ pub async fn open_app(app: AppHandle, app_name: String) {
 
 fn is_bloom_launch_target(target: &str, identifier: &str) -> bool {
     target == "bloom-settings"
+        || target == "awaken-settings"
         || target.eq_ignore_ascii_case(identifier)
         || std::path::Path::new(target)
             .file_name()
-            .is_some_and(|name| name.to_string_lossy().eq_ignore_ascii_case("bloom.exe"))
+            .is_some_and(|name| {
+                let n = name.to_string_lossy();
+                n.eq_ignore_ascii_case("bloom.exe") || n.eq_ignore_ascii_case("awaken.exe")
+            })
 }
 
 /// Launches another instance of an app instead of focusing an existing window.
