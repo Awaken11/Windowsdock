@@ -1253,7 +1253,7 @@ pub fn atomic_write_file(path: &std::path::Path, content: &[u8]) -> Result<(), S
         "{}.tmp-{}-{}",
         path.file_name()
             .and_then(|name| name.to_str())
-            .unwrap_or("bloom"),
+            .unwrap_or("awaken"),
         std::process::id(),
         NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
     ));
@@ -1305,6 +1305,96 @@ pub fn save_setting_file(
     write_settings_file(path, &settings)?;
     replace_settings_cache(settings.clone());
     Ok(settings)
+}
+
+/// Migrate legacy settings, clipboard, and pinned apps from Bloom to Awaken.
+/// Safe and non-destructive: never overwrites existing Awaken settings, and never deletes legacy files.
+pub fn migrate_legacy_data(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let target_dir = match app.path().app_config_dir() {
+        Ok(dir) => dir,
+        Err(_) => return,
+    };
+
+    let target_settings = target_dir.join("settings.json");
+    if target_settings.exists() {
+        // Awaken settings already exist; never overwrite.
+        return;
+    }
+
+    let appdata = match std::env::var("APPDATA") {
+        Ok(d) => std::path::PathBuf::from(d),
+        Err(_) => return,
+    };
+
+    let legacy_candidates = [
+        appdata.join("com.sehaz.bloom"),
+        appdata.join("bloom"),
+    ];
+
+    for legacy in &legacy_candidates {
+        let legacy_settings = legacy.join("settings.json");
+        if legacy_settings.exists() {
+            if let Ok(settings) = read_settings_file(&legacy_settings) {
+                if !settings.is_empty() {
+                    let _ = std::fs::create_dir_all(&target_dir);
+                    let _ = write_settings_file(&target_settings, &settings);
+
+                    // Also mirror to %APPDATA%\Awaken if target is different
+                    let awaken_dir = appdata.join("Awaken");
+                    if awaken_dir != target_dir {
+                        let _ = std::fs::create_dir_all(&awaken_dir);
+                        let _ = write_settings_file(&awaken_dir.join("settings.json"), &settings);
+                    }
+
+                    // Copy complementary state files if present
+                    for file_name in &["clipboard_history.json", "pinned_apps.json", "icons_cache.json"] {
+                        let src_file = legacy.join(file_name);
+                        let dst_file = target_dir.join(file_name);
+                        if src_file.exists() && !dst_file.exists() {
+                            let _ = std::fs::copy(&src_file, &dst_file);
+                        }
+                    }
+
+                    // Copy custom_icons folder if present
+                    let src_icons = legacy.join("custom_icons");
+                    let dst_icons = target_dir.join("custom_icons");
+                    if src_icons.is_dir() && !dst_icons.exists() {
+                        let _ = std::fs::create_dir_all(&dst_icons);
+                        if let Ok(entries) = std::fs::read_dir(&src_icons) {
+                            for entry in entries.flatten() {
+                                if let Ok(ft) = entry.file_type() {
+                                    if ft.is_file() {
+                                        let _ = std::fs::copy(entry.path(), dst_icons.join(entry.file_name()));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // Windows startup registry cleanup: remove legacy "Bloom" entry if present
+    clean_legacy_autostart_registry();
+}
+
+fn clean_legacy_autostart_registry() {
+    unsafe {
+        use windows::Win32::System::Registry::{RegDeleteValueW, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE};
+        use windows::core::PCWSTR;
+
+        let subkey: Vec<u16> = "Software\\Microsoft\\Windows\\CurrentVersion\\Run\0".encode_utf16().collect();
+        let value_name: Vec<u16> = "Bloom\0".encode_utf16().collect();
+        let mut key = HKEY::default();
+
+        if RegOpenKeyExW(HKEY_CURRENT_USER, PCWSTR(subkey.as_ptr()), Some(0), KEY_SET_VALUE, &mut key).is_ok() {
+            let _ = RegDeleteValueW(key, PCWSTR(value_name.as_ptr()));
+            let _ = windows::Win32::System::Registry::RegCloseKey(key);
+        }
+    }
 }
 
 /// Load settings.json into the in-memory cache. Call once at startup.

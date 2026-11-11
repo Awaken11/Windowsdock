@@ -64,11 +64,11 @@ fn main() {
             CreateEventW, CreateMutexW, OpenEventW, SetEvent, SYNCHRONIZATION_ACCESS_RIGHTS,
         };
 
-        let mutex_name: Vec<u16> = "BloomSingleInstance"
+        let mutex_name: Vec<u16> = "AwakenSingleInstance"
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();
-        let event_name: Vec<u16> = "BloomOpenSettings"
+        let event_name: Vec<u16> = "AwakenOpenSettings"
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();
@@ -242,6 +242,8 @@ fn main() {
         .setup(|app| {
             clipboard::start_clipboard_monitor(app.handle().clone());
             init_taskbar_marker(app.handle());
+            // Migrate legacy Bloom settings and state if this is first launch of Awaken
+            crate::utils::migrate_legacy_data(app.handle());
             // Populate the settings cache before anything else: a webview can
             // invoke save_setting as soon as it loads, which happens before the
             // rest of this hook runs.
@@ -446,16 +448,16 @@ fn main() {
             {
                 use tauri::menu::{Menu, MenuItem};
                 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-                let quit_item = MenuItem::with_id(app, "quit", "Quit Bloom", true, None::<&str>)?;
+                let quit_item = MenuItem::with_id(app, "quit", "Quit Awaken", true, None::<&str>)?;
                 let restart_item =
-                    MenuItem::with_id(app, "restart", "Restart Bloom", true, None::<&str>)?;
+                    MenuItem::with_id(app, "restart", "Restart Awaken", true, None::<&str>)?;
                 let settings_item =
                     MenuItem::with_id(app, "settings", "Open Settings", true, None::<&str>)?;
                 let menu = Menu::with_items(app, &[&settings_item, &restart_item, &quit_item])?;
                 let ah = app.handle().clone();
                 TrayIconBuilder::new()
                     .icon(app.default_window_icon().unwrap().clone())
-                    .tooltip("Bloom")
+                    .tooltip("Awaken")
                     .menu(&menu)
                     .on_menu_event(move |_, event| match event.id().as_ref() {
                         "quit" => {

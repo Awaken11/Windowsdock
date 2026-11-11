@@ -122,7 +122,7 @@ jobs:
           done <<< "$(git log "$RANGE" --no-merges --pretty=format:'COMMIT|%s' --name-only)"
           emit
 
-          NOTES=$(printf "## Bloom %s\n" "$VERSION")
+          NOTES=$(printf "## Awaken %s\n" "$VERSION")
           if [ -n "$FEATURES" ]; then
             NOTES+=$(printf "\n### What's New\n%s\n" "$FEATURES")
           fi
@@ -147,7 +147,7 @@ jobs:
           TAURI_SIGNING_PASSWORD: ${{ secrets.TAURI_SIGNING_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "Bloom ${{ github.ref_name }}"
+          releaseName: "Awaken ${{ github.ref_name }}"
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false

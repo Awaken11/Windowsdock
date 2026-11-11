@@ -1,8 +1,8 @@
 [package]
-name = "bloom"
+name = "awaken"
 version = "3.10.1"
-description = ""
-authors = ["sehaz"]
+description = "Awaken - A modern Windows desktop experience featuring a Dynamic Island, intelligent Dock and productivity tools"
+authors = ["Awaken Contributors"]
 edition = "2021"
 license = "GPL-3.0-only"
 
@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "bloom_lib"
+name = "awaken_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

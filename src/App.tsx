@@ -4408,7 +4408,7 @@ function App() {
 														e.stopPropagation();
 														openSettingsWindow();
 													}}
-													title="Bloom Settings"
+													title="Awaken Settings"
 												>
 													<SettingsIcon />
 												</button>
@@ -4418,7 +4418,7 @@ function App() {
 														e.stopPropagation();
 														invoke("restart_bloom");
 													}}
-													title="Restart Bloom"
+													title="Restart Awaken"
 												>
 													<ReloadIcon />
 												</button>

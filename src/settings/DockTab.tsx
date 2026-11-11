@@ -80,7 +80,7 @@ function DrivePicker({
 }
 
 const START_ICON_PRESETS = [
-	{ key: "default", src: "/bloom.png", label: "Bloom" },
+	{ key: "default", src: "/awaken.png", label: "Awaken" },
 	{ key: "bloom-colorful", src: "/bloom-colorful.png", label: "Colorful" },
 	{ key: "bloom-golden", src: "/bloom-golden.png", label: "Golden" },
 	{ key: "bloom-biscuit", src: "/bloom-biscuit.png", label: "Orange" },

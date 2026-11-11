@@ -339,6 +339,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "awaken"
+version = "3.10.1"
+dependencies = [
+ "base64 0.22.1",
+ "image",
+ "rustfft",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-clipboard-manager",
+ "tauri-plugin-dialog",
+ "tauri-plugin-drag",
+ "tauri-plugin-opener",
+ "tauri-plugin-updater",
+ "tokio",
+ "webview2-com",
+ "window-vibrancy 0.7.1",
+ "windows 0.61.3",
+ "windows-collections",
+ "windows-core 0.61.2",
+ "wmi",
+ "zip",
+]
+
+[[package]]
 name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -430,33 +457,6 @@ dependencies = [
  "futures-io",
  "futures-lite",
  "piper",
-]
-
-[[package]]
-name = "bloom"
-version = "3.10.1"
-dependencies = [
- "base64 0.22.1",
- "image",
- "rustfft",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-clipboard-manager",
- "tauri-plugin-dialog",
- "tauri-plugin-drag",
- "tauri-plugin-opener",
- "tauri-plugin-updater",
- "tokio",
- "webview2-com",
- "window-vibrancy 0.7.1",
- "windows 0.61.3",
- "windows-collections",
- "windows-core 0.61.2",
- "wmi",
- "zip",
 ]
 
 [[package]]

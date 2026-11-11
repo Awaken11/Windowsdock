@@ -42,7 +42,7 @@ interface BtPairingRequest {
 
 const ERROR_TEXT: Record<string, string> = {
 	"not-found": "Refresh and try again",
-	unsupported: "Bloom can connect headphones and speakers only",
+	unsupported: "Awaken can connect headphones and speakers only",
 	timeout: "The device didn't answer in time",
 	cancelled: "Pairing was cancelled",
 	failed: "Couldn't pair with this device",

@@ -354,7 +354,7 @@ export function NotchTab({
 				<SettingRow
 					icon={Archive}
 					label="Keep Items"
-					desc="Keep shelf items after Bloom closes"
+					desc="Keep shelf items after Awaken closes"
 					divider={false}
 				>
 					<label className="toggle-switch">

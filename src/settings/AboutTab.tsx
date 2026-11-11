@@ -37,7 +37,7 @@ export function AboutTab({
 			case "available":
 				return `Update Available (v${updateVersion})`;
 			case "uptodate":
-				return "Bloom is up to date";
+				return "Awaken is up to date";
 			case "downloading":
 				return "Downloading Update...";
 			case "installing":
@@ -71,19 +71,22 @@ export function AboutTab({
 	return (
 		<div className="about-tab-container">
 			<div className="about-header">
-				<img src="/bloom.png" className="about-logo" alt="Bloom Logo" draggable={false} />
-				<h1 className="about-title">Bloom</h1>
+				<img src="/awaken.png" className="about-logo" alt="Awaken Logo" draggable={false} />
+				<h1 className="about-title">Awaken</h1>
 				<p className="about-version">Version {appVersion}</p>
 				<p className="about-credit">
-					Made with <span className="about-heart">❤️</span> by{" "}
+					Maintained by{" "}
 					<button
 						className="about-author"
-						onClick={() => openUrl("https://github.com/SehajveerSingh2005")}
-						title="sehaz on GitHub"
+						onClick={() => openUrl("https://github.com/Awaken11/Windowsdock")}
+						title="Awaken on GitHub"
 					>
 						<GithubIcon size={12} />
-						<span>sehaz</span>
+						<span>Awaken11</span>
 					</button>
+					<span style={{ display: "block", marginTop: "4px", fontSize: "11px", opacity: 0.6 }}>
+						Originally based on Bloom by sehaz • GPL-3.0
+					</span>
 				</p>
 			</div>
 

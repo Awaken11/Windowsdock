@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "bloom",
+  "productName": "Awaken",
   "version": "3.10.1",
-  "identifier": "com.sehaz.bloom",
+  "identifier": "com.akhil.awaken",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
       {
         "label": "main",
         "url": "index.html",
-        "title": "bloom",
+        "title": "Awaken",
         "width": 1920,
         "height": 420,
         "x": 0,
@@ -36,7 +36,7 @@
       {
         "label": "settings",
         "create": false,
-        "title": "Settings",
+        "title": "Awaken Settings",
         "url": "settings.html",
         "width": 740,
         "height": 560,
@@ -56,7 +56,7 @@
       },
       {
         "label": "overlay",
-        "title": "Overlay",
+        "title": "Awaken App Switcher",
         "url": "overlay.html",
         "width": 1920,
         "height": 1080,
@@ -78,7 +78,7 @@
       },
       {
         "label": "dock",
-        "title": "Bloom Dock",
+        "title": "Awaken Dock",
         "url": "dock.html",
         "width": 1920,
         "height": 600,
@@ -100,18 +100,18 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ipc: http://ipc.localhost https://api.open-meteo.com https://geocoding-api.open-meteo.com https://ipapi.co http://ip-api.com https://bloom.sehaz.space"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ipc: http://ipc.localhost https://api.open-meteo.com https://geocoding-api.open-meteo.com https://ipapi.co http://ip-api.com"
     }
   },
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
     "targets": "all",
-    "publisher": "Sehajveer Singh",
-    "copyright": "Copyright © 2026 Sehajveer Singh",
+    "publisher": "Awaken",
+    "copyright": "Copyright © 2026 Awaken Contributors",
     "category": "Utility",
-    "shortDescription": "A notch and dock for Windows",
-    "longDescription": "Bloom replaces the Windows taskbar with a dock and adds a notch for media, quick controls and status.",
+    "shortDescription": "Awaken - A modern Windows desktop experience featuring a Dynamic Island, intelligent Dock and productivity tools",
+    "longDescription": "Awaken replaces the Windows taskbar with an intelligent dock and adds a dynamic island for media, notifications, quick controls and status.",
     "windows": {
       "webviewInstallMode": {
         "type": "embedBootstrapper"
@@ -127,9 +127,9 @@
   },
   "plugins": {
     "updater": {
-      "active": true,
+      "active": false,
       "endpoints": [
-        "https://github.com/SehajveerSingh2005/bloom/releases/latest/download/latest.json"
+        "https://github.com/Awaken11/Windowsdock/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQzQTAzNTlBRUFFODRFMDUKUldRRlR1anFtaldnUThWRExWQ2ZDVmxhNGlFREFPYWZoV1BWbGdQNUxxdHpnbzZPbGh4SWxVMk0K"
     }
