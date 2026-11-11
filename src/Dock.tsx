@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, memo } from "react";
-import { motion, AnimatePresence, Reorder } from "framer-motion";
+import { motion, AnimatePresence, Reorder, useSpring } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import "./Dock.css";
@@ -18,6 +18,7 @@ import {
 	type TrayApp
 } from "./dockApps";
 import { driveLetter, hideDrive, removeCustomFolder, type DockExtra } from "./dockExtras";
+import { FolderStackPopover } from "./components/FolderStackPopover";
 import { createRegionSender, measureElements, padRect, type RegionRect } from "./windowRegion";
 
 // Host processes (Edge/Chrome/Brave/ApplicationFrameHost) run every PWA/UWP
@@ -125,6 +126,45 @@ function TaskViewIcon() {
 	);
 }
 
+function SearchIcon() {
+	return (
+		<svg
+			viewBox="0 0 24 24"
+			fill="none"
+			strokeWidth="2.2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className="dock-search-svg"
+		>
+			<defs>
+				<linearGradient id="bloomSearchGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+					<stop offset="0%" stopColor="#38bdf8" />
+					<stop offset="100%" stopColor="#0284c7" />
+				</linearGradient>
+			</defs>
+			<circle cx="10.5" cy="10.5" r="6.5" stroke="url(#bloomSearchGrad)" />
+			<line x1="15.5" y1="15.5" x2="20.5" y2="20.5" stroke="url(#bloomSearchGrad)" />
+		</svg>
+	);
+}
+
+function SettingsGearIcon() {
+	return (
+		<svg
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			style={{ width: 22, height: 22, stroke: "rgba(255, 255, 255, 0.9)" }}
+		>
+			<circle cx="12" cy="12" r="3" />
+			<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+		</svg>
+	);
+}
+
 function resolveStartIcon(startIcon: string): string {
 	if (startIcon === "bloom-colorful") return "/bloom-colorful.png";
 	if (startIcon === "bloom-golden") return "/bloom-golden.png";
@@ -190,6 +230,10 @@ const Dock = memo(function Dock() {
 	const [dockAdaptive, setDockAdaptive] = useState(
 		() => localStorage.getItem("bloom-dock-adaptive") === "true"
 	);
+	const [dockSearchEnabled, setDockSearchEnabled] = useState(
+		() => localStorage.getItem("bloom-dock-search-enabled") !== "false"
+	);
+	const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 	const [dockTaskView, setDockTaskView] = useState(
 		() => localStorage.getItem("bloom-dock-task-view") === "true"
 	);
@@ -220,6 +264,7 @@ const Dock = memo(function Dock() {
 		app: AppInfo | null;
 		extra?: DockExtra | null;
 		taskView?: boolean;
+		searchButton?: boolean;
 	} | null>(null);
 	const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
 	const [activeOrder, setActiveOrder] = useState<string[]>([]);
@@ -232,6 +277,15 @@ const Dock = memo(function Dock() {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [startupAnimating, setStartupAnimating] = useState(false);
 	const [customIcons, setCustomIcons] = useState<Record<string, string>>({});
+	const [activeFolderStack, setActiveFolderStack] = useState<{
+		extra: DockExtra;
+		anchorX: number;
+	} | null>(null);
+	const folderStackRef = useRef<HTMLDivElement | null>(null);
+	const [, setRegionTick] = useState(0);
+	const [springAppId, setSpringAppId] = useState<string | null>(null);
+	const springAppIdRef = useRef<string | null>(null);
+	const springTimerRef = useRef<any>(null);
 	const [toast, setToast] = useState<string | null>(null);
 	const iconPickerTargetRef = useRef<string | null>(null);
 	const toastTimerRef = useRef<any>(null);
@@ -254,15 +308,16 @@ const Dock = memo(function Dock() {
 	// behind the pill (which paints above it), so the seam stays fused even
 	// if the measurement is off by a few px at some scale.
 	useEffect(() => {
-		if (showAddPopup) {
+		if (showAddPopup || activeFolderStack) {
 			const h = dockRef.current?.getBoundingClientRect().height ?? 0;
 			if (h > 0) setPopupBottom(h / (scale || 1) - 14);
 		}
-	}, [showAddPopup, scale]);
+	}, [showAddPopup, activeFolderStack, scale]);
 
 	const isCurrentlyHovered = isDockHovered || isEdgeHovered;
 	const [interactionState, setInteractionState] = useState<"active" | "grace" | "none">("none");
-	const isAnyInteraction = isCurrentlyHovered || !!contextMenu || showAddPopup || nativeMenuOpen;
+	const isAnyInteraction =
+		isCurrentlyHovered || !!contextMenu || showAddPopup || nativeMenuOpen || !!activeFolderStack;
 
 	const previewTimerRef = useRef<any>(null);
 	const isPreviewHoveredRef = useRef(false);
@@ -339,7 +394,7 @@ const Dock = memo(function Dock() {
 		const updateRect = () => {
 			if (dockRef.current) {
 				const rect = dockRef.current.getBoundingClientRect();
-				const hasPreview = !!previewData;
+				const hasPreview = !!previewData || showAddPopup || !!activeFolderStack;
 				const content = dockRef.current.querySelector<HTMLElement>(".dock-reorder-container");
 				const style = getComputedStyle(dockRef.current);
 				const overlap = content
@@ -353,9 +408,9 @@ const Dock = memo(function Dock() {
 				invoke("update_dock_rect", {
 					rect: {
 						x: Math.round(rect.x) - (hasPreview ? 500 : 0),
-						y: Math.round(rect.y) - (hasPreview ? 320 : 0),
+						y: Math.round(rect.y) - (hasPreview ? 420 : 0),
 						width: Math.round(rect.width) + (hasPreview ? 1000 : 0),
-						height: Math.round(rect.height) + (hasPreview ? 320 : 0)
+						height: Math.round(rect.height) + (hasPreview ? 420 : 0)
 					},
 					overlapRect: overlap
 						? { ...overlap, y: Math.round(rect.y), height: Math.round(rect.height) }
@@ -375,7 +430,7 @@ const Dock = memo(function Dock() {
 			window.removeEventListener("resize", updateRect);
 			observer.disconnect();
 		};
-	}, [pinnedApps, activeApps, isHidden, isExpanded, previewData, scale]);
+	}, [pinnedApps, activeApps, isHidden, isExpanded, previewData, showAddPopup, activeFolderStack, scale]);
 
 	useEffect(() => {
 		const init = async () => {
@@ -407,6 +462,8 @@ const Dock = memo(function Dock() {
 
 			const adaptive = getVal("bloom-dock-adaptive", "false");
 			setDockAdaptive(adaptive === "true");
+			const searchEnabled = getVal("bloom-dock-search-enabled", "true");
+			setDockSearchEnabled(searchEnabled !== "false");
 			setDockTaskView(getVal("bloom-dock-task-view", "false") === "true");
 
 			const startIconVal = getVal("bloom-start-icon", "default") || "default";
@@ -468,12 +525,26 @@ const Dock = memo(function Dock() {
 			setIsMaximized(event.payload);
 		});
 
+		const unlistenSearchOpen = listen("dock-search-open", () => {
+			setIsSearchExpanded(true);
+			setHoveredApp(null);
+			setWaveCrestX(null);
+		});
+
+		const unlistenSearchClose = listen("dock-search-close", () => {
+			setIsSearchExpanded(false);
+			setHoveredApp(null);
+			setWaveCrestX(null);
+		});
+
 		return () => {
 			unlistenOverlap.then((f) => f());
 			unlistenInstalledApps.then((f) => f());
 			unlistenEdgeHover.then((f) => f());
 			unlistenVisibility.then((f) => f());
 			unlistenMaximized.then((f) => f());
+			unlistenSearchOpen.then((f) => f());
+			unlistenSearchClose.then((f) => f());
 		};
 	}, []);
 
@@ -484,6 +555,7 @@ const Dock = memo(function Dock() {
 		"bloom-dock-icon-only": setDockIconOnly,
 		"bloom-dock-separator-enabled": setDockSeparatorEnabled,
 		"bloom-dock-adaptive": setDockAdaptive,
+		"bloom-dock-search-enabled": setDockSearchEnabled,
 		"bloom-dock-task-view": setDockTaskView,
 		"bloom-start-icon": setStartIcon,
 		"bloom-scale": setScale,
@@ -795,9 +867,183 @@ const Dock = memo(function Dock() {
 		setContextMenu({ x: e.clientX, y: e.clientY, app });
 	};
 
-	const handleExtraClick = (extra: DockExtra) => {
+	const handleExtraClick = (extra: DockExtra, e?: React.MouseEvent) => {
+		if (extra.kind === "folder" || extra.kind === "custom") {
+			if (activeFolderStack && activeFolderStack.extra.id === extra.id) {
+				setActiveFolderStack(null);
+				return;
+			}
+			let anchorX = window.innerWidth / 2;
+			if (e && e.currentTarget) {
+				const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+				anchorX = rect.left + rect.width / 2;
+			}
+			setActiveFolderStack({ extra, anchorX });
+			setShowAddPopup(false);
+			closeMenu();
+			window.focus();
+			return;
+		}
 		invoke("open_dock_extra", { kind: extra.kind, path: extra.path }).catch(showActionError);
 	};
+
+	const clearSpringTimer = () => {
+		if (springTimerRef.current) {
+			clearTimeout(springTimerRef.current);
+			springTimerRef.current = null;
+		}
+	};
+
+	const handleAppDragEnter = (e: React.DragEvent, app: AppInfo) => {
+		e.preventDefault();
+		e.stopPropagation();
+		if (!app.is_running && !app.hwnd && (!app.all_hwnds || app.all_hwnds.length === 0)) {
+			return;
+		}
+		const key = itemKey(app);
+		if (springAppIdRef.current !== key) {
+			clearSpringTimer();
+			springAppIdRef.current = key;
+			setSpringAppId(key);
+			springTimerRef.current = setTimeout(async () => {
+				try {
+					await invoke("spring_load_focus", {
+						hwnd: app.hwnd,
+						hwnds: app.all_hwnds?.map(([hwnd]) => hwnd)
+					});
+				} catch (err) {
+					console.error("Spring-load focus error:", err);
+				}
+			}, 450);
+		}
+	};
+
+	const handleAppDragOver = (e: React.DragEvent, _app: AppInfo) => {
+		e.preventDefault();
+		e.stopPropagation();
+		try {
+			e.dataTransfer.dropEffect = "copy";
+		} catch (_) {}
+	};
+
+	const handleAppDragLeave = (e: React.DragEvent, app: AppInfo) => {
+		e.preventDefault();
+		e.stopPropagation();
+		const currentTarget = e.currentTarget;
+		const related = e.relatedTarget as Node | null;
+		if (currentTarget && related && currentTarget.contains(related)) {
+			return;
+		}
+		if (springAppIdRef.current === itemKey(app)) {
+			clearSpringTimer();
+			springAppIdRef.current = null;
+			setSpringAppId(null);
+		}
+	};
+
+	const handleAppDrop = (e: React.DragEvent, _app: AppInfo) => {
+		e.preventDefault();
+		e.stopPropagation();
+		clearSpringTimer();
+		springAppIdRef.current = null;
+		setSpringAppId(null);
+	};
+
+	useEffect(() => {
+		return () => {
+			clearSpringTimer();
+			springAppIdRef.current = null;
+		};
+	}, []);
+
+	useEffect(() => {
+		invoke("setup_dock_drop").catch((e) =>
+			console.error("[dock] drop target setup failed:", e)
+		);
+
+		const unlistenOver = listen<{ position: { x: number; y: number } }>(
+			"dock-drag-over",
+			(event) => {
+				const pos = event.payload?.position;
+				if (!pos) return;
+				const dpr = window.devicePixelRatio || 1;
+				const cssX = pos.x / dpr;
+				const cssY = pos.y / dpr;
+				const el = document.elementFromPoint(cssX, cssY);
+				const wrapper = el?.closest<HTMLElement>(".dock-icon-wrapper");
+				const appId = wrapper?.getAttribute("data-app-id");
+
+				if (!appId) {
+					if (springAppIdRef.current !== null) {
+						clearSpringTimer();
+						springAppIdRef.current = null;
+						setSpringAppId(null);
+					}
+					return;
+				}
+
+				if (springAppIdRef.current === appId) {
+					return;
+				}
+
+				const isExtra = dockExtras.some((e) => e.id === appId);
+				const targetApp = dockItemsRef.current.find(
+					(item) => itemKey(item) === appId
+				);
+				const isRunning =
+					targetApp &&
+					(targetApp.is_running ||
+						!!targetApp.hwnd ||
+						(targetApp.all_hwnds && targetApp.all_hwnds.length > 0));
+
+				if (!targetApp && !isExtra) {
+					if (springAppIdRef.current !== null) {
+						clearSpringTimer();
+						springAppIdRef.current = null;
+						setSpringAppId(null);
+					}
+					return;
+				}
+
+				clearSpringTimer();
+				springAppIdRef.current = appId;
+				setSpringAppId(appId);
+
+				if (targetApp && isRunning) {
+					springTimerRef.current = setTimeout(async () => {
+						try {
+							await invoke("spring_load_focus", {
+								hwnd: targetApp.hwnd,
+								hwnds: targetApp.all_hwnds?.map(([hwnd]) => hwnd)
+							});
+						} catch (err) {
+							console.error("Spring-load focus error:", err);
+						}
+					}, 450);
+				}
+			}
+		);
+
+		const unlistenLeave = listen("dock-drag-leave", () => {
+			clearSpringTimer();
+			springAppIdRef.current = null;
+			setSpringAppId(null);
+		});
+
+		const unlistenDrop = listen("dock-drag-drop", () => {
+			clearSpringTimer();
+			springAppIdRef.current = null;
+			setSpringAppId(null);
+		});
+
+		return () => {
+			clearSpringTimer();
+			springAppIdRef.current = null;
+			unlistenOver.then((fn) => fn());
+			unlistenLeave.then((fn) => fn());
+			unlistenDrop.then((fn) => fn());
+		};
+	}, []);
 
 	const handleExtraContextMenu = (e: React.MouseEvent, extra: DockExtra) => {
 		e.stopPropagation();
@@ -830,6 +1076,22 @@ const Dock = memo(function Dock() {
 		const next = hideDrive(localStorage.getItem("bloom-dock-extras-hidden-drives"), letter);
 		localStorage.setItem("bloom-dock-extras-hidden-drives", next);
 		invoke("save_setting", { key: "bloom-dock-extras-hidden-drives", value: next }).catch(
+			showActionError
+		);
+		closeMenu();
+	};
+
+	const openSearch = () => {
+		setIsSearchExpanded(true);
+		setHoveredApp(null);
+		setWaveCrestX(null);
+		invoke("open_system_action", { action: "search" }).catch(showActionError);
+	};
+
+	const hideSearchButton = () => {
+		setDockSearchEnabled(false);
+		localStorage.setItem("bloom-dock-search-enabled", "false");
+		invoke("save_setting", { key: "bloom-dock-search-enabled", value: "false" }).catch(
 			showActionError
 		);
 		closeMenu();
@@ -885,11 +1147,36 @@ const Dock = memo(function Dock() {
 			setContextMenu(null);
 			setActiveSubmenu(null);
 			setShowAddPopup(false);
+			setIsSearchExpanded(false);
+			setActiveFolderStack(null);
 		});
 		return () => {
 			unlisten.then((f) => f());
 		};
 	}, []);
+
+	useEffect(() => {
+		if (!isSearchExpanded) return;
+		const interval = setInterval(async () => {
+			try {
+				const open = await invoke<boolean>("is_search_open");
+				if (!open) {
+					setIsSearchExpanded(false);
+				}
+			} catch (_) {}
+		}, 350);
+		const onPointerDown = (e: PointerEvent) => {
+			const target = e.target as HTMLElement | null;
+			if (!target?.closest(".dock-search-pill")) {
+				setIsSearchExpanded(false);
+			}
+		};
+		window.addEventListener("pointerdown", onPointerDown);
+		return () => {
+			clearInterval(interval);
+			window.removeEventListener("pointerdown", onPointerDown);
+		};
+	}, [isSearchExpanded]);
 
 	// The tallest the expanded bar has been, which sets the region's bottom band.
 	const dockBandHeightRef = useRef(0);
@@ -925,7 +1212,8 @@ const Dock = memo(function Dock() {
 				[".preview-tooltip", 40],
 				[".context-menu", 34],
 				[".submenu", 34],
-				[".dock-toast", 20]
+				[".dock-toast", 20],
+				[".folder-stack-popover", 40]
 			])
 		);
 		// The Add App popup grows from scaleY 0, and that animation doesn't
@@ -938,6 +1226,24 @@ const Dock = memo(function Dock() {
 			const p = popup.getBoundingClientRect();
 			const a = anchor.getBoundingClientRect();
 			wanted.push(padRect({ x: p.left, y: a.top, width: p.width, height: a.height }, 40));
+		}
+		if (activeFolderStack) {
+			const popoverWidth = 360 * scale;
+			const popoverHeight = 400 * scale;
+			const idealLeft = activeFolderStack.anchorX - popoverWidth / 2;
+			const left = Math.max(16, Math.min(idealLeft, window.innerWidth - popoverWidth - 16));
+			const top = Math.max(10, window.innerHeight - (popupBottom + 20) * scale - popoverHeight);
+			wanted.push({
+				x: Math.round(left) - 20,
+				y: Math.round(top) - 20,
+				width: Math.round(popoverWidth) + 40,
+				height: Math.round(popoverHeight) + 40
+			});
+		}
+		const folderStack = folderStackRef.current;
+		if (folderStack) {
+			const p = folderStack.getBoundingClientRect();
+			wanted.push(padRect({ x: p.left, y: p.top, width: p.width, height: p.height }, 40));
 		}
 		sendDockRegion(wanted);
 	});
@@ -964,10 +1270,33 @@ const Dock = memo(function Dock() {
 				height: Math.round(r.height)
 			};
 			open = true;
+		} else if (activeFolderStack) {
+			if (folderStackRef.current) {
+				const r = folderStackRef.current.getBoundingClientRect();
+				rect = {
+					x: Math.round(r.x) - 10,
+					y: Math.round(r.y) - 10,
+					width: Math.round(r.width) + 20,
+					height: Math.round(r.height) + 20
+				};
+			} else {
+				const popoverWidth = 360 * scale;
+				const popoverHeight = 400 * scale;
+				const idealLeft = activeFolderStack.anchorX - popoverWidth / 2;
+				const left = Math.max(16, Math.min(idealLeft, window.innerWidth - popoverWidth - 16));
+				const top = Math.max(10, window.innerHeight - (popupBottom + 20) * scale - popoverHeight);
+				rect = {
+					x: Math.round(left),
+					y: Math.round(top),
+					width: Math.round(popoverWidth),
+					height: Math.round(popoverHeight)
+				};
+			}
+			open = true;
 		}
 
 		invoke("set_menu_open", { open, rect }).catch(() => {});
-	}, [contextMenu, menuPos, showAddPopup, pinnedApps, activeApps, activeSubmenu, scale]);
+	}, [contextMenu, menuPos, showAddPopup, activeFolderStack, pinnedApps, activeApps, activeSubmenu, scale]);
 
 	const dockItems = useMemo(() => {
 		const runningMap = new Map();
@@ -1077,6 +1406,11 @@ const Dock = memo(function Dock() {
 		return [...pinned, ...unpinned];
 	}, [pinnedApps, activeApps, activeOrder]);
 
+	const dockItemsRef = useRef(dockItems);
+	useEffect(() => {
+		dockItemsRef.current = dockItems;
+	}, [dockItems]);
+
 	const startItem = useMemo(
 		() => dockItems.find((i) => i.path === "start") as AppInfo,
 		[dockItems]
@@ -1117,6 +1451,150 @@ const Dock = memo(function Dock() {
 		[dockItems]
 	);
 	const unpinnedItems = useMemo(() => dockItems.filter((i) => !i.is_pinned), [dockItems]);
+
+	const orderedDockKeys = useMemo(() => {
+		const keys: string[] = [];
+		if (startItem) keys.push(itemKey(startItem));
+		if (dockSearchEnabled && isSearchExpanded) keys.push("dock-search");
+		if (dockTaskView) keys.push("task-view");
+		if (dockExtrasPosition === "left") {
+			dockExtras.forEach((e) => keys.push(e.id));
+		}
+		pinnedItems.forEach((p) => keys.push(itemKey(p)));
+		unpinnedItems.forEach((u) => keys.push(itemKey(u)));
+		if (dockExtrasPosition === "right") {
+			dockExtras.forEach((e) => keys.push(e.id));
+		}
+		return keys;
+	}, [startItem, dockSearchEnabled, isSearchExpanded, dockTaskView, pinnedItems, unpinnedItems, dockExtras, dockExtrasPosition]);
+
+	const [dockWidth, setDockWidth] = useState(0);
+	const [waveCrestX, setWaveCrestX] = useState<number | null>(null);
+	const [smoothCrestX, setSmoothCrestX] = useState<number | null>(null);
+	const [smoothH, setSmoothH] = useState(0);
+
+	const crestXSpring = useSpring(0, { stiffness: 360, damping: 26, mass: 0.8 });
+	const crestHSpring = useSpring(0, { stiffness: 360, damping: 26, mass: 0.8 });
+
+	useLayoutEffect(() => {
+		if (!dockRef.current) return;
+		const updateWidth = () => {
+			if (dockRef.current) {
+				const rect = dockRef.current.getBoundingClientRect();
+				const currentScale = scale || 1;
+				setDockWidth(rect.width / currentScale);
+			}
+		};
+		updateWidth();
+		const ro = new ResizeObserver(updateWidth);
+		ro.observe(dockRef.current);
+		return () => ro.disconnect();
+	}, [scale]);
+
+	const activeWaveKey = springAppId || (isDragging ? null : hoveredApp);
+
+	useLayoutEffect(() => {
+		if (!activeWaveKey || !dockRef.current) {
+			if (!isDockHovered && !springAppId) {
+				setWaveCrestX(null);
+			}
+			return;
+		}
+		const wrappers = dockRef.current.querySelectorAll<HTMLElement>(".dock-icon-wrapper");
+		let el: HTMLElement | null = null;
+		for (let i = 0; i < wrappers.length; i++) {
+			if (wrappers[i].getAttribute("data-app-id") === activeWaveKey) {
+				el = wrappers[i];
+				break;
+			}
+		}
+		if (!el) {
+			if (!isDockHovered && !springAppId) {
+				setWaveCrestX(null);
+			}
+			return;
+		}
+		const dockRect = dockRef.current.getBoundingClientRect();
+		const elRect = el.getBoundingClientRect();
+		const currentScale = scale || 1;
+		const cx = (elRect.left + elRect.width / 2 - dockRect.left) / currentScale;
+		setWaveCrestX(cx);
+	}, [activeWaveKey, isDragging, scale, dockWidth, isSearchExpanded, isDockHovered, springAppId]);
+
+	useEffect(() => {
+		const isWaveActive = (isDockHovered && !isDragging) || !!springAppId;
+		if (isWaveActive) {
+			const targetH = springAppId ? 13 : 9.5;
+			crestHSpring.set(targetH);
+		} else {
+			crestHSpring.set(0);
+		}
+	}, [isDockHovered, isDragging, springAppId, crestHSpring]);
+
+	useEffect(() => {
+		if (waveCrestX === null) return;
+		if (smoothCrestX === null) {
+			crestXSpring.jump(waveCrestX);
+			setSmoothCrestX(waveCrestX);
+		} else {
+			crestXSpring.set(waveCrestX);
+		}
+	}, [waveCrestX, smoothCrestX, crestXSpring]);
+
+	useEffect(() => {
+		return crestXSpring.on("change", (latest) => {
+			setSmoothCrestX(latest);
+		});
+	}, [crestXSpring]);
+
+	useEffect(() => {
+		return crestHSpring.on("change", (latest) => {
+			setSmoothH(latest);
+			if (latest <= 0.05 && !isDockHovered && !springAppId) {
+				setSmoothCrestX(null);
+			}
+		});
+	}, [crestHSpring, isDockHovered, springAppId]);
+
+	const getWaveTransform = (key: string) => {
+		if (pressedApp === key) return { scale: 0.95, y: 0 };
+		if (!activeWaveKey || (isDragging && !springAppId)) {
+			return { scale: 1, y: 0 };
+		}
+		const activeIndex = orderedDockKeys.indexOf(activeWaveKey);
+		const myIndex = orderedDockKeys.indexOf(key);
+		if (activeIndex === -1 || myIndex === -1) {
+			return { scale: 1, y: 0 };
+		}
+		const dist = Math.abs(myIndex - activeIndex);
+		const isSpring = !!springAppId;
+
+		if (dist === 0) {
+			return isSpring
+				? { y: -7, scale: 1.20 }
+				: { y: -5, scale: 1.15 };
+		} else if (dist === 1) {
+			return isSpring
+				? { y: -4, scale: 1.11 }
+				: { y: -2.8, scale: 1.08 };
+		} else if (dist === 2) {
+			return isSpring
+				? { y: -1.8, scale: 1.05 }
+				: { y: -1.2, scale: 1.04 };
+		} else if (dist === 3) {
+			return isSpring
+				? { y: -0.5, scale: 1.02 }
+				: { y: -0.3, scale: 1.015 };
+		}
+		return { scale: 1, y: 0 };
+	};
+
+	const waveTransition = {
+		type: "spring" as const,
+		stiffness: 360,
+		damping: 26,
+		mass: 0.8
+	};
 
 	// Latest state for the Win+Number listener, which subscribes only once.
 	useEffect(() => {
@@ -1232,12 +1710,6 @@ const Dock = memo(function Dock() {
 		};
 	}, [hoveredApp, isDragging, dockItems]);
 
-	const iconVariants = {
-		idle: { y: 0, scale: 1 },
-		hover: { y: -5, scale: 1.1 },
-		drag: { y: -10, scale: 1.1, opacity: 0.8 },
-		tap: { scale: 0.95 }
-	};
 
 	const renderExtra = (extra: DockExtra) => (
 		<motion.div
@@ -1247,6 +1719,7 @@ const Dock = memo(function Dock() {
 			animate={{ opacity: 1, scale: 1 }}
 			exit={{ opacity: 0, scale: 0, transition: { duration: 0.12 } }}
 			className="dock-icon-wrapper"
+			data-app-id={extra.id}
 			onContextMenu={(e) => handleExtraContextMenu(e, extra)}
 			onMouseEnter={() => setHoveredApp(extra.id)}
 			onMouseLeave={() => {
@@ -1256,16 +1729,49 @@ const Dock = memo(function Dock() {
 			onMouseDown={(e) => {
 				if (e.button === 1) e.preventDefault();
 			}}
+			onDragEnter={(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				clearSpringTimer();
+				springAppIdRef.current = extra.id;
+				setSpringAppId(extra.id);
+			}}
+			onDragOver={(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				try {
+					e.dataTransfer.dropEffect = "copy";
+				} catch (_) {}
+			}}
+			onDragLeave={(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				const currentTarget = e.currentTarget;
+				const related = e.relatedTarget as Node | null;
+				if (currentTarget && related && currentTarget.contains(related)) return;
+				if (springAppIdRef.current === extra.id) {
+					clearSpringTimer();
+					springAppIdRef.current = null;
+					setSpringAppId(null);
+				}
+			}}
+			onDrop={(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				clearSpringTimer();
+				springAppIdRef.current = null;
+				setSpringAppId(null);
+			}}
 			onClick={(e) => {
 				e.stopPropagation();
-				handleExtraClick(extra);
+				handleExtraClick(extra, e);
 			}}
 		>
 			{hoveredApp === extra.id && <div className="tooltip">{extra.name}</div>}
 			<motion.div
 				className="dock-icon"
-				variants={iconVariants}
-				animate={pressedApp === extra.id ? "tap" : hoveredApp === extra.id ? "hover" : "idle"}
+				animate={getWaveTransform(extra.id)}
+				transition={waveTransition}
 				onPointerDown={() => setPressedApp(extra.id)}
 				onPointerUp={() => setPressedApp(null)}
 				onPointerCancel={() => setPressedApp(null)}
@@ -1299,26 +1805,36 @@ const Dock = memo(function Dock() {
 						setIsDockHovered(false);
 						setHoveredApp(null);
 						setPressedApp(null);
+						setWaveCrestX(null);
+					}}
+					onPointerMove={(e) => {
+						if (!dockRef.current) return;
+						const rect = dockRef.current.getBoundingClientRect();
+						const currentScale = scale || 1;
+						const mouseX = (e.clientX - rect.left) / currentScale;
+						if (!activeWaveKey) {
+							setWaveCrestX(mouseX);
+						}
 					}}
 					initial={{
 						y: -800,
 						opacity: 1,
 						width: 34,
 						height: 34,
-						borderTopLeftRadius: 17,
-						borderTopRightRadius: 17,
-						borderBottomLeftRadius: 17,
-						borderBottomRightRadius: 17
+						borderTopLeftRadius: 18,
+						borderTopRightRadius: 18,
+						borderBottomLeftRadius: 18,
+						borderBottomRightRadius: 18
 					}}
 					animate={{
 						y: !isReady ? -800 : isVisible ? (isHidden ? 100 : 0) : 150,
 						width:
 							isExpanded && !isHidden && isVisible ? (isAdaptive ? adaptiveWidth : "auto") : 34,
 						height: isExpanded && !isHidden && isVisible ? "auto" : 34,
-						borderTopLeftRadius: (isImpacted || isExpanded) && !isHidden && isVisible ? 18 : 17,
-						borderTopRightRadius: (isImpacted || isExpanded) && !isHidden && isVisible ? 18 : 17,
-						borderBottomLeftRadius: (isImpacted || isExpanded) && !isHidden && isVisible ? 0 : 17,
-						borderBottomRightRadius: (isImpacted || isExpanded) && !isHidden && isVisible ? 0 : 17,
+						borderTopLeftRadius: 18,
+						borderTopRightRadius: 18,
+						borderBottomLeftRadius: (isImpacted || isExpanded) && !isHidden && isVisible ? 0 : 18,
+						borderBottomRightRadius: (isImpacted || isExpanded) && !isHidden && isVisible ? 0 : 18,
 						opacity: isVisible ? 1 : 0,
 						scale: scale
 					}}
@@ -1327,8 +1843,6 @@ const Dock = memo(function Dock() {
 						width: { type: "spring", stiffness: 250, damping: 22, mass: 0.8 },
 						height: { type: "spring", stiffness: 250, damping: 22, mass: 0.8 },
 						layout: isDragging ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 25 },
-						borderTopLeftRadius: { type: "spring", stiffness: 500, damping: 30 },
-						borderTopRightRadius: { type: "spring", stiffness: 500, damping: 30 },
 						borderBottomLeftRadius: { type: "spring", stiffness: 500, damping: 30 },
 						borderBottomRightRadius: { type: "spring", stiffness: 500, damping: 30 },
 						opacity: { type: "tween", duration: 0.2 },
@@ -1337,7 +1851,16 @@ const Dock = memo(function Dock() {
 					style={{ originX: 0.5, originY: 1, minWidth: 34 }}
 					onContextMenu={(e) => handleContextMenu(e, null)}
 				>
-					<EdgeSurface edge="bottom" flares={isExpanded && !isHidden} reflective={edgeShineEnabled} />
+					<EdgeSurface
+						edge="bottom"
+						flares={isExpanded && !isHidden}
+						reflective={edgeShineEnabled}
+						wave={
+							smoothCrestX !== null && smoothH > 0.05
+								? { crestX: smoothCrestX, height: smoothH }
+								: null
+						}
+					/>
 					<AnimatePresence>
 						{isExpanded && (
 							<motion.div
@@ -1357,6 +1880,7 @@ const Dock = memo(function Dock() {
 											scale: { type: "spring", stiffness: 400, damping: 25, delay: 0.15 }
 										}}
 										className="dock-icon-wrapper"
+										data-app-id={itemKey(startItem)}
 										onContextMenu={(e) => handleContextMenu(e, startItem)}
 										onMouseEnter={() => setHoveredApp(itemKey(startItem))}
 										onMouseLeave={() => {
@@ -1370,14 +1894,8 @@ const Dock = memo(function Dock() {
 										)}
 										<motion.div
 											className="dock-icon"
-											variants={iconVariants}
-											animate={
-												pressedApp === itemKey(startItem)
-													? "tap"
-													: hoveredApp === itemKey(startItem)
-														? "hover"
-														: "idle"
-											}
+											animate={getWaveTransform(itemKey(startItem))}
+											transition={waveTransition}
 											onPointerDown={() => setPressedApp(itemKey(startItem))}
 											onPointerUp={() => setPressedApp(null)}
 											onPointerCancel={() => setPressedApp(null)}
@@ -1399,6 +1917,42 @@ const Dock = memo(function Dock() {
 									</motion.div>
 								)}
 
+								{dockSearchEnabled && isSearchExpanded && (
+									<motion.div
+										key="dock-search-bar"
+										initial={{ opacity: 0, scale: 0.85, width: 0 }}
+										animate={{ opacity: 1, scale: 1, width: 170 }}
+										exit={{ opacity: 0, scale: 0.85, width: 0 }}
+										transition={{
+											type: "spring",
+											stiffness: 450,
+											damping: 32
+										}}
+										className="dock-search-wrapper"
+										onMouseEnter={() => {
+											setHoveredApp(null);
+											setPressedApp(null);
+										}}
+										onContextMenu={(e) => {
+											e.stopPropagation();
+											e.preventDefault();
+											setContextMenu({ x: e.clientX, y: e.clientY, app: null, searchButton: true });
+										}}
+										onClick={(e) => {
+											e.stopPropagation();
+											openSearch();
+										}}
+									>
+										<div className="dock-search-pill">
+											<SearchIcon />
+											<div className="dock-search-content">
+												<span className="dock-search-text">Search</span>
+												<span className="dock-search-cursor" />
+											</div>
+										</div>
+									</motion.div>
+								)}
+
 								{dockTaskView && (
 									<motion.div
 										key="task-view"
@@ -1406,6 +1960,7 @@ const Dock = memo(function Dock() {
 										animate={{ opacity: 1, scale: 1 }}
 										exit={{ opacity: 0, scale: 0, transition: { duration: 0.12 } }}
 										className="dock-icon-wrapper"
+										data-app-id="task-view"
 										onContextMenu={(e) => {
 											e.stopPropagation();
 											e.preventDefault();
@@ -1422,14 +1977,8 @@ const Dock = memo(function Dock() {
 										)}
 										<motion.div
 											className="dock-icon"
-											variants={iconVariants}
-											animate={
-												pressedApp === "task-view"
-													? "tap"
-													: hoveredApp === "task-view"
-														? "hover"
-														: "idle"
-											}
+											animate={getWaveTransform("task-view")}
+											transition={waveTransition}
 											onPointerDown={() => setPressedApp("task-view")}
 											onPointerUp={() => setPressedApp(null)}
 											onPointerCancel={() => setPressedApp(null)}
@@ -1485,6 +2034,7 @@ const Dock = memo(function Dock() {
 										>
 											<motion.div
 												className="dock-icon-wrapper"
+												data-app-id={itemKey(app)}
 												initial={ITEM_INITIAL}
 												animate={ITEM_ANIMATE}
 												exit={ITEM_EXIT}
@@ -1496,6 +2046,10 @@ const Dock = memo(function Dock() {
 														setPressedApp(null);
 													}
 												}}
+												onDragEnter={(e) => handleAppDragEnter(e, app)}
+												onDragOver={(e) => handleAppDragOver(e, app)}
+												onDragLeave={(e) => handleAppDragLeave(e, app)}
+												onDrop={(e) => handleAppDrop(e, app)}
 											>
 												<AnimatePresence>
 													{dockPreviewEnabled &&
@@ -1558,17 +2112,9 @@ const Dock = memo(function Dock() {
 												)}
 												<motion.div
 													className="dock-icon"
-													variants={iconVariants}
-													animate={
-														pressedApp === itemKey(app)
-															? "tap"
-															: isDragging && !app.is_pinned
-																? "idle"
-																: hoveredApp === itemKey(app) && !isDragging
-																	? "hover"
-																	: "idle"
-													}
-													whileDrag="drag"
+													animate={getWaveTransform(itemKey(app))}
+													transition={waveTransition}
+													whileDrag={{ scale: 1.1, y: -10, opacity: 0.8 }}
 													onPointerDown={() => setPressedApp(itemKey(app))}
 													onPointerUp={() => setPressedApp(null)}
 													onPointerCancel={() => setPressedApp(null)}
@@ -1604,6 +2150,8 @@ const Dock = memo(function Dock() {
 																className={isBloomOrSettings ? "bloom-icon-img" : ""}
 																draggable={false}
 															/>
+														) : isBloomOrSettings ? (
+															<SettingsGearIcon />
 														) : (
 															<div className="fallback-icon">{app.name[0]}</div>
 														);
@@ -1645,6 +2193,7 @@ const Dock = memo(function Dock() {
 										}}
 										exit={{ opacity: 0, scale: 0, transition: { duration: 0.12 } }}
 										className="dock-icon-wrapper"
+										data-app-id={itemKey(app)}
 										onContextMenu={(e) => handleContextMenu(e, app)}
 										onMouseEnter={() => setHoveredApp(itemKey(app))}
 										onMouseLeave={() => {
@@ -1661,6 +2210,10 @@ const Dock = memo(function Dock() {
 											e.stopPropagation();
 											handleAppClick(app);
 										}}
+										onDragEnter={(e) => handleAppDragEnter(e, app)}
+										onDragOver={(e) => handleAppDragOver(e, app)}
+										onDragLeave={(e) => handleAppDragLeave(e, app)}
+										onDrop={(e) => handleAppDrop(e, app)}
 									>
 										<AnimatePresence>
 											{dockPreviewEnabled &&
@@ -1721,14 +2274,8 @@ const Dock = memo(function Dock() {
 										)}
 										<motion.div
 											className="dock-icon"
-											variants={iconVariants}
-											animate={
-												pressedApp === itemKey(app)
-													? "tap"
-													: hoveredApp === itemKey(app) && !isDragging
-														? "hover"
-														: "idle"
-											}
+											animate={getWaveTransform(itemKey(app))}
+											transition={waveTransition}
 											onPointerDown={() => setPressedApp(itemKey(app))}
 											onPointerUp={() => setPressedApp(null)}
 											onPointerCancel={() => setPressedApp(null)}
@@ -1762,6 +2309,8 @@ const Dock = memo(function Dock() {
 														className={isBloomOrSettings ? "bloom-icon-img" : ""}
 														draggable={false}
 													/>
+												) : isBloomOrSettings ? (
+													<SettingsGearIcon />
 												) : (
 													<div className="fallback-icon">{app.name[0]}</div>
 												);
@@ -1806,6 +2355,7 @@ const Dock = memo(function Dock() {
 				>
 					{!contextMenu.extra &&
 						!contextMenu.taskView &&
+						!contextMenu.searchButton &&
 						(!contextMenu.app || contextMenu.app.path === "start") && (
 						<div
 							style={{
@@ -1845,16 +2395,43 @@ const Dock = memo(function Dock() {
 					)}
 					{contextMenu.extra ? (
 						<>
-							<div
-								className="menu-item"
-								onClick={() => {
-									const extra = contextMenu.extra!;
-									closeMenu();
-									handleExtraClick(extra);
-								}}
-							>
-								Open
-							</div>
+							{contextMenu.extra.kind === "folder" || contextMenu.extra.kind === "custom" ? (
+								<>
+									<div
+										className="menu-item"
+										onClick={() => {
+											const extra = contextMenu.extra!;
+											const anchorX = contextMenu.x;
+											closeMenu();
+											setActiveFolderStack({ extra, anchorX });
+											window.focus();
+										}}
+									>
+										Open Stack
+									</div>
+									<div
+										className="menu-item"
+										onClick={() => {
+											const extra = contextMenu.extra!;
+											closeMenu();
+											invoke("open_dock_extra", { kind: extra.kind, path: extra.path }).catch(showActionError);
+										}}
+									>
+										Open in File Explorer
+									</div>
+								</>
+							) : (
+								<div
+									className="menu-item"
+									onClick={() => {
+										const extra = contextMenu.extra!;
+										closeMenu();
+										handleExtraClick(extra);
+									}}
+								>
+									Open
+								</div>
+							)}
 							{contextMenu.extra.kind === "drive" && contextMenu.extra.removable && (
 								<div className="menu-item" onClick={() => ejectExtra(contextMenu.extra!)}>
 									Eject
@@ -1882,6 +2459,22 @@ const Dock = memo(function Dock() {
 									</div>
 								</>
 							)}
+						</>
+					) : contextMenu.searchButton ? (
+						<>
+							<div
+								className="menu-item"
+								onClick={() => {
+									closeMenu();
+									openSearch();
+								}}
+							>
+								Open Search
+							</div>
+							<div className="menu-divider" />
+							<div className="menu-item" onClick={hideSearchButton}>
+								Hide Search button
+							</div>
 						</>
 					) : contextMenu.taskView ? (
 						<>
@@ -2112,6 +2705,23 @@ const Dock = memo(function Dock() {
 						runningApps={activeApps}
 						pinned={pinnedApps}
 						bottom={popupBottom}
+					/>
+				)}
+			</AnimatePresence>
+
+			<AnimatePresence>
+				{activeFolderStack && (
+					<FolderStackPopover
+						popoverRef={folderStackRef}
+						folder={activeFolderStack.extra}
+						anchorX={activeFolderStack.anchorX}
+						scale={scale}
+						bottomOffset={popupBottom}
+						onClose={() => setActiveFolderStack(null)}
+						onOpenFolderInExplorer={(path) =>
+							invoke("open_dock_extra", { kind: "folder", path }).catch(showActionError)
+						}
+						onLayoutChange={() => setRegionTick((t) => t + 1)}
 					/>
 				)}
 			</AnimatePresence>

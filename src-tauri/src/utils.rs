@@ -58,6 +58,7 @@ static ORIGINAL_SEC_TRAY_RECTS: std::sync::Mutex<
     Option<std::collections::HashMap<isize, windows::Win32::Foundation::RECT>>,
 > = std::sync::Mutex::new(None);
 static ORIGINAL_TASKBAR_STATE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+static ORIGINAL_SEARCHBOX_MODE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
 static TASKBAR_OWNER_PID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 static TASKBAR_OWNER_HWND: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
 
@@ -345,6 +346,74 @@ fn is_placed_rect(rect: &windows::Win32::Foundation::RECT) -> bool {
     rect.right > rect.left && rect.bottom > rect.top && rect.left > -9000 && rect.top > -9000
 }
 
+fn get_searchbox_taskbar_mode() -> Option<i32> {
+    use windows::core::w;
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_CURRENT_USER, KEY_READ, REG_DWORD,
+    };
+    unsafe {
+        let mut key = Default::default();
+        if RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            w!("Software\\Microsoft\\Windows\\CurrentVersion\\Search"),
+            Some(0),
+            KEY_READ,
+            &mut key,
+        )
+        .is_ok()
+        {
+            let mut val = 0u32;
+            let mut val_type = REG_DWORD;
+            let mut len = std::mem::size_of::<u32>() as u32;
+            let res = RegQueryValueExW(
+                key,
+                w!("SearchboxTaskbarMode"),
+                None,
+                Some(&mut val_type),
+                Some(&mut val as *mut u32 as *mut u8),
+                Some(&mut len),
+            );
+            let _ = RegCloseKey(key);
+            if res.is_ok() {
+                return Some(val as i32);
+            }
+        }
+    }
+    None
+}
+
+fn set_searchbox_taskbar_mode(mode: i32) {
+    use windows::core::w;
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegOpenKeyExW, RegSetValueExW, HKEY_CURRENT_USER, KEY_SET_VALUE, REG_DWORD,
+    };
+    unsafe {
+        let mut key = Default::default();
+        if RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            w!("Software\\Microsoft\\Windows\\CurrentVersion\\Search"),
+            Some(0),
+            KEY_SET_VALUE,
+            &mut key,
+        )
+        .is_ok()
+        {
+            let val = mode as u32;
+            let _ = RegSetValueExW(
+                key,
+                w!("SearchboxTaskbarMode"),
+                Some(0),
+                REG_DWORD,
+                Some(std::slice::from_raw_parts(
+                    &val as *const u32 as *const u8,
+                    std::mem::size_of::<u32>(),
+                )),
+            );
+            let _ = RegCloseKey(key);
+        }
+    }
+}
+
 pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) -> bool {
     // Delayed AppBar and tray callbacks cannot hide Windows' taskbar after the
     // dock has been disabled or while its tray is in use.
@@ -422,6 +491,23 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) -> bool {
             let original_state = SHAppBarMessage(ABM_GETSTATE, &mut get_abd);
             ORIGINAL_TASKBAR_STATE
                 .store(original_state as i32, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        if !visible {
+            if ORIGINAL_SEARCHBOX_MODE.load(std::sync::atomic::Ordering::Relaxed) == -1 {
+                if let Some(mode) = get_searchbox_taskbar_mode() {
+                    ORIGINAL_SEARCHBOX_MODE.store(mode, std::sync::atomic::Ordering::Relaxed);
+                    if mode == 2 || mode == 3 {
+                        // Switch from Search Box to Search Icon so Windows 11 doesn't paint a stray 220px box over the screen
+                        set_searchbox_taskbar_mode(1);
+                    }
+                }
+            }
+        } else {
+            let orig_search = ORIGINAL_SEARCHBOX_MODE.load(std::sync::atomic::Ordering::Relaxed);
+            if orig_search != -1 {
+                set_searchbox_taskbar_mode(orig_search);
+            }
         }
 
         // Persist the original state and placement before hiding. The watchdog

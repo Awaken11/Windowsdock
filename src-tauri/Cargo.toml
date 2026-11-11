@@ -59,6 +59,7 @@ windows = { version = "0.61", features = [
 	"Win32_System_IO",
 	"Win32_Security",
 	"Win32_System_Registry",
+	"Win32_System_DataExchange",
 	"Win32_Devices_FunctionDiscovery",
 	"Devices_Radios",
 	"Devices_Bluetooth",
@@ -75,7 +76,10 @@ windows = { version = "0.61", features = [
 	"Win32_NetworkManagement_IpHelper",
 	"Win32_NetworkManagement_Ndis",
 	"Win32_NetworkManagement_WiFi",
-	"Win32_NetworkManagement_WNet"
+	"Win32_NetworkManagement_WNet",
+	"UI_Notifications",
+	"UI_Notifications_Management",
+	"ApplicationModel"
 ] }
 base64 = "0.22"
 tauri-plugin-autostart = "2.5.1"

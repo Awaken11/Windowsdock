@@ -15,6 +15,7 @@ import {
 	HardDrive,
 	Trash2,
 	Copy,
+	Search,
 	FolderOpen,
 	FolderPlus,
 	Plus,
@@ -126,6 +127,8 @@ interface DockTabProps {
 	toggleDockExtrasDrive: (letter: string) => void;
 	dockExtrasRecycleBin: boolean;
 	toggleDockExtrasRecycleBin: () => void;
+	dockSearchEnabled: boolean;
+	toggleDockSearch: () => void;
 	dockTaskView: boolean;
 	toggleDockTaskView: () => void;
 	dockExtrasFolders: string;
@@ -162,6 +165,8 @@ export function DockTab({
 	toggleDockExtrasDrive,
 	dockExtrasRecycleBin,
 	toggleDockExtrasRecycleBin,
+	dockSearchEnabled,
+	toggleDockSearch,
 	dockTaskView,
 	toggleDockTaskView,
 	dockExtrasFolders,
@@ -259,6 +264,13 @@ export function DockTab({
 									checked={dockSeparatorEnabled}
 									onChange={toggleDockSeparator}
 								/>
+								<span className="slider"></span>
+							</label>
+						</SettingRow>
+
+						<SettingRow icon={Search} label="Search Bar (Win+S)" desc="Expand embedded search bar in Dock when Win+S is pressed">
+							<label className="toggle-switch">
+								<input type="checkbox" checked={dockSearchEnabled} onChange={toggleDockSearch} />
 								<span className="slider"></span>
 							</label>
 						</SettingRow>

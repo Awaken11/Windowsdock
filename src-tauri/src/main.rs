@@ -19,6 +19,9 @@ mod usb;
 mod utils;
 mod wifi;
 mod window_region;
+mod dock_drop;
+mod clipboard;
+mod notifications;
 
 use std::sync::atomic::Ordering;
 use tauri::Manager;
@@ -148,6 +151,8 @@ fn main() {
             set_notch_hovered,
             set_notch_visible,
             setup_shelf_drop,
+            setup_dock_drop,
+            spring_load_focus,
             shelf_thumbnail,
             shelf_drag_icon,
             shelf_prune,
@@ -157,6 +162,7 @@ fn main() {
             show_tray_context_menu,
             activate_tray_icon,
             open_system_action,
+            is_search_open,
             get_app_icon,
             get_installed_apps,
             save_pinned_apps,
@@ -209,6 +215,8 @@ fn main() {
             dock_extras::open_dock_extra,
             dock_extras::eject_dock_extra,
             dock_extras::get_dock_drives,
+            dock_extras::get_folder_items,
+            dock_extras::show_in_folder,
             wifi::wifi_list_networks,
             wifi::wifi_scan,
             wifi::wifi_connect,
@@ -223,9 +231,16 @@ fn main() {
             bluetooth::bluetooth_unpair,
             bluetooth::bluetooth_refresh_buds,
             usb::usb_list_devices,
-            jack::jack_list_devices
+            jack::jack_list_devices,
+            clipboard::get_clipboard_history,
+            clipboard::clear_clipboard_history,
+            clipboard::remove_clipboard_item,
+            clipboard::copy_clipboard_item,
+            notifications::dismiss_notification,
+            notifications::focus_notification_app
         ])
         .setup(|app| {
+            clipboard::start_clipboard_monitor(app.handle().clone());
             init_taskbar_marker(app.handle());
             // Populate the settings cache before anything else: a webview can
             // invoke save_setting as soon as it loads, which happens before the
@@ -237,6 +252,28 @@ fn main() {
             if taskbar_marker_exists() {
                 restore_taskbar_after_crash();
                 NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
+            }
+
+            // Immediately suppress Windows native taskbar on startup if dock is enabled
+            if crate::utils::dock_enabled() {
+                let hidden = crate::utils::set_taskbar_visibility(false, false);
+                NATIVE_TASKBAR_HIDDEN.store(hidden, Ordering::Relaxed);
+                setup_taskbar_hook();
+                if !hidden {
+                    // Explorer's Shell_TrayWnd may still be initializing at Windows logon
+                    tauri::async_runtime::spawn(async {
+                        for _ in 0..60 {
+                            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                            if !crate::utils::dock_enabled() {
+                                break;
+                            }
+                            if crate::utils::set_taskbar_visibility(false, false) {
+                                NATIVE_TASKBAR_HIDDEN.store(true, Ordering::Relaxed);
+                                break;
+                            }
+                        }
+                    });
+                }
             }
 
             // Update check on startup (non-blocking). Always runs so the UI can
@@ -257,6 +294,7 @@ fn main() {
             // click-through bit directly. The worst a rebuild does is make the
             // window click-through until the next cursor update.
             let _ = window.set_ignore_cursor_events(true);
+            let _ = window.show();
             let dock_win = app.get_webview_window("dock").unwrap();
             // Same for the dock window, which has a region too.
             let _ = dock_win.set_ignore_cursor_events(true);
@@ -385,6 +423,7 @@ fn main() {
             bluetooth::setup_bluetooth_notifications(app.handle().clone());
             usb::setup_usb_notifications(app.handle().clone());
             jack::setup_jack_notifications(app.handle().clone());
+            notifications::setup_notifications(app.handle().clone());
 
             // Listen for second-instance signal to open settings
             if let Some(&h_event) = SINGLE_INSTANCE_EVENT_HANDLE.get() {

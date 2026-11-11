@@ -36,3 +36,6 @@ skills-lock.json
 
 #agents
 .mimocode
+
+# Internal Context
+context.md

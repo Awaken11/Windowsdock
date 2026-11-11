@@ -45,7 +45,7 @@ pub fn setup_keyboard_hook(app_handle: AppHandle) {
     std::thread::spawn(move || {
         // Exiting removes the hook with the process; never touch it mid-shutdown.
         while !SHUTTING_DOWN.load(Ordering::Relaxed) {
-            let wanted = NATIVE_TASKBAR_HIDDEN.load(Ordering::Relaxed) && dock_win_number_enabled();
+            let wanted = NATIVE_TASKBAR_HIDDEN.load(Ordering::Relaxed) || MENU_IS_OPEN.load(Ordering::Relaxed);
             if wanted != (KEYBOARD_HOOK.load(Ordering::Relaxed) != 0) {
                 // A low-level hook runs on the thread that installed it, which
                 // needs a message loop, so install and remove it on the main thread.
@@ -181,6 +181,23 @@ unsafe extern "system" fn keyboard_hook_proc(
         // Only physical presses drive the Win+Number replacement; injected
         // events (our own Start taps and mask key) must not re-enter it.
         if (kb.flags.0 & LLKHF_INJECTED.0) == 0 {
+            if vk_code == windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE
+                && is_down
+                && MENU_IS_OPEN.load(Ordering::Relaxed)
+            {
+                MENU_IS_OPEN.store(false, Ordering::Relaxed);
+                let app = KEYBOARD_HOOK_APP_HANDLE
+                    .get()
+                    .cloned()
+                    .or_else(|| WINDOW_CHANGE_APP_HANDLE.get().cloned());
+                if let Some(app) = app {
+                    tauri::async_runtime::spawn(async move {
+                        let _ = app.emit("dock-dismiss-menu", ());
+                    });
+                }
+                return windows::Win32::Foundation::LRESULT(1);
+            }
+
             if vk_code == VK_LWIN || vk_code == VK_RWIN {
                 if is_down {
                     WIN_KEY_DOWN.store(true, Ordering::Relaxed);
@@ -192,6 +209,18 @@ unsafe extern "system" fn keyboard_hook_proc(
                     WIN_NUMBER_HELD.store(0, Ordering::Relaxed);
                 }
             } else if WIN_KEY_DOWN.load(Ordering::Relaxed) {
+                if vk_code.0 == 0x53 && is_down {
+                    let search_was_open = crate::commands::is_start_menu_open();
+                    if let Some(app) = KEYBOARD_HOOK_APP_HANDLE.get().cloned() {
+                        tauri::async_runtime::spawn(async move {
+                            if search_was_open {
+                                let _ = app.emit_to("dock", "dock-search-close", ());
+                            } else {
+                                let _ = app.emit_to("dock", "dock-search-open", ());
+                            }
+                        });
+                    }
+                }
                 if let Some(index) = win_number_index(vk_code.0) {
                     let slot = index + 1;
                     if is_up {
@@ -226,7 +255,13 @@ use crate::state::*;
 use crate::types::*;
 use crate::utils::*;
 
+static TASKBAR_HOOK_INSTALLED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 pub fn setup_taskbar_hook() {
+    if TASKBAR_HOOK_INSTALLED.swap(true, Ordering::SeqCst) {
+        return;
+    }
     unsafe {
         use windows::Win32::UI::Accessibility::SetWinEventHook;
         use windows::Win32::UI::WindowsAndMessaging::{
@@ -877,6 +912,7 @@ pub fn setup_audio_visualization(app_handle: AppHandle) {
                                         {
                                             let mut total_mag = 0.0f32;
                                             let mut count = 0u32;
+                                            #[allow(clippy::needless_range_loop)]
                                             for bin in bin_start..bin_end {
                                                 if bin >= FFT_SIZE / 2 {
                                                     break;
@@ -1482,7 +1518,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 }
                 // Overlap uses the expanded content width. Hit-testing still
                 // uses DOCK_RECT, which includes the live pill and previews.
-                let overlap_span = DOCK_OVERLAP_RECT
+                let _overlap_span = DOCK_OVERLAP_RECT
                     .lock()
                     .ok()
                     .and_then(|r| *r)
@@ -1601,41 +1637,17 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                         && (is_client_fullscreen || is_matches_screen)
                                         && !is_maximized_standard;
 
-                                    if is_primary && (current_is_fs || is_maximized) {
+                                    // In smart mode, the dock and notch float over standard regular and maximized
+                                    // windows without reserving screen space. Overlap hiding is only triggered
+                                    // when a window is in true fullscreen (e.g. F11 media, games).
+                                    if is_primary && current_is_fs {
                                         should_overlap = true;
                                         should_notch_overlap = true;
-                                        // Standard maximized windows leave the dock's
-                                        // reserved strip empty on both sides, so the dock
-                                        // can stretch to a full taskbar. True fullscreen
-                                        // windows cover the screen and should not.
-                                        should_maximized = is_maximized && !current_is_fs;
+                                        should_maximized = false;
                                     } else if is_primary {
                                         should_overlap = false;
-                                        if let Some(span) = overlap_span {
-                                            should_overlap = window_reaches_dock(
-                                                span,
-                                                (rect.left, rect.right, rect.bottom),
-                                                screen_rect.bottom - (56.0 * cached_scale) as i32,
-                                            );
-                                        }
-
-                                        if let Ok(notch_rect_lock) = NOTCH_RECT.lock() {
-                                            if let Some(nr) = *notch_rect_lock {
-                                                let scale = cached_scale;
-                                                let n_left = (nr.x as f64 * scale) as i32;
-                                                let n_right =
-                                                    n_left + (nr.width as f64 * scale) as i32;
-                                                let res_h = (36.0 * scale) as i32;
-                                                let trigger_y = screen_rect.top + res_h;
-
-                                                if rect.left < n_right - 4
-                                                    && rect.right > n_left + 4
-                                                    && rect.top < trigger_y - 4
-                                                {
-                                                    should_notch_overlap = true;
-                                                }
-                                            }
-                                        }
+                                        should_notch_overlap = false;
+                                        should_maximized = is_maximized;
                                     }
                                 }
                             }
@@ -1741,11 +1753,13 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
     tx
 }
 
+#[allow(dead_code)]
 fn dock_span_px(dock: IntRect, scale: f64) -> (i32, i32) {
     let left = (dock.x as f64 * scale) as i32;
     (left, left + (dock.width as f64 * scale) as i32)
 }
 
+#[allow(dead_code)]
 fn window_reaches_dock(span: (i32, i32), window: (i32, i32, i32), trigger_y: i32) -> bool {
     window.0 < span.1 - 4 && window.1 > span.0 + 4 && window.2 > trigger_y + 4
 }
@@ -1928,7 +1942,7 @@ pub fn setup_brightness_worker() {
         let locator: IWbemLocator = match CoCreateInstance(&WbemLocator, None, CLSCTX_ALL) {
             Ok(l) => l,
             Err(_) => {
-                let _ = CoUninitialize();
+                CoUninitialize();
                 return;
             }
         };
@@ -1945,7 +1959,7 @@ pub fn setup_brightness_worker() {
         ) {
             Ok(s) => s,
             Err(_) => {
-                let _ = CoUninitialize();
+                CoUninitialize();
                 return;
             }
         };
@@ -2062,7 +2076,7 @@ pub fn setup_brightness_worker() {
             // 2. Desktop external monitor via Physical Monitor API (DXVA2 DDC/CI)
             set_physical_monitors_brightness(brightness);
         }
-        let _ = CoUninitialize();
+        CoUninitialize();
     });
 }
 
@@ -2572,9 +2586,8 @@ fn update_main_interaction(
         }
         // Bloom is fully click-through here, so the webview cannot clear its
         // own hover state; do it for it.
-        if NOTCH_IS_HOVERED.swap(false, Ordering::Relaxed) {
-            let _ = app_handle.emit("notch-pointer-left", ());
-        }
+        NOTCH_IS_HOVERED.store(false, Ordering::Relaxed);
+        let _ = app_handle.emit("notch-pointer-left", ());
         return;
     }
 
@@ -2698,7 +2711,8 @@ fn update_main_interaction(
         // mouseleave that would clear its hover state (it may already have
         // missed it if the pointer left in the same frame). Tell it explicitly
         // or the notch stays expanded in peek/smart mode.
-        if new_ignore == 1 && NOTCH_IS_HOVERED.swap(false, Ordering::Relaxed) {
+        if new_ignore == 1 {
+            NOTCH_IS_HOVERED.store(false, Ordering::Relaxed);
             let _ = app_handle.emit("notch-pointer-left", ());
         }
     }
@@ -2844,14 +2858,15 @@ fn update_dock_interaction(
     let mut dock_span: Option<(i32, i32)> = None;
 
     let dock_rect_val = DOCK_WINDOW_RECT.lock().ok().and_then(|g| *g);
-
-    if let Some((win_pos, win_size)) = dock_rect_val {
-        let in_window = cursor.x >= win_pos.x
+    let in_dock_window = dock_rect_val.is_some_and(|(win_pos, win_size)| {
+        cursor.x >= win_pos.x
             && cursor.x <= (win_pos.x + win_size.width as i32)
             && cursor.y >= win_pos.y
-            && cursor.y <= (win_pos.y + win_size.height as i32);
+            && cursor.y <= (win_pos.y + win_size.height as i32)
+    });
 
-        if in_window {
+    if let Some((win_pos, _win_size)) = dock_rect_val {
+        if in_dock_window {
             if let Ok(region) = DOCK_RECT.try_lock() {
                 if let Some(r) = *region {
                     let scale = dock_win.scale_factor().unwrap_or(1.0);
@@ -2906,6 +2921,10 @@ fn update_dock_interaction(
     // Hot-edge detection (Bottom edge). Only a dwelled (armed) edge, a dock
     // hover, or a recent hover reveals the dock — a pass through the band does
     // not.
+    let drag_held = unsafe {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+        (GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000) != 0
+    };
     let in_dock_hover = DOCK_IS_HOVERED.load(Ordering::Relaxed);
     let scale = dock_win.scale_factor().unwrap_or(1.0);
     let edge_armed = dock_edge_armed_for(app_handle, cursor, now, scale);
@@ -2920,13 +2939,22 @@ fn update_dock_interaction(
 
     // Approaching along the bottom edge keeps the dock interactive while near
     // its horizontal span, so the reveal can't be clicked through mid-animation.
-    // Only an armed edge may claim the strip; the corners and a mere pass stay
-    // click-through.
-    if at_bottom_edge && edge_armed {
+    // Also, a held left button or active OLE drag over the dock or near the edge
+    // forces interactivity so OLE and drag events reach the dock webview.
+    let ole_drag = crate::dock_drop::DOCK_OLE_DRAG_ACTIVE.load(Ordering::Relaxed);
+    if ole_drag {
+        is_click_interactive = true;
+        is_hovered = true;
+        MH_DOCK_EXPIRY_MS.store(now + 600, Ordering::Relaxed);
+    } else if (at_bottom_edge && edge_armed) || (drag_held && (at_bottom_edge || in_dock_window)) {
         if let Some((span_left, span_right)) = dock_span {
             let edge_pad = (60.0 * scale) as i32;
             if cursor.x >= span_left - edge_pad && cursor.x <= span_right + edge_pad {
                 is_click_interactive = true;
+                if drag_held {
+                    is_hovered = true;
+                    MH_DOCK_EXPIRY_MS.store(now + 600, Ordering::Relaxed);
+                }
             }
         }
     }
@@ -2945,8 +2973,10 @@ fn update_dock_interaction(
     let prev_ignore = MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed);
     let new_ignore = if should_ignore { 1 } else { 0 };
     if prev_ignore != new_ignore {
-        if let Ok(hwnd) = dock_win.hwnd() {
-            re_assert_topmost(hwnd);
+        if !drag_held && !ole_drag {
+            if let Ok(hwnd) = dock_win.hwnd() {
+                re_assert_topmost(hwnd);
+            }
         }
         MH_LAST_DOCK_IGNORE.store(new_ignore, Ordering::Relaxed);
     }
@@ -3703,12 +3733,17 @@ fn lock_main_appbar() -> std::sync::MutexGuard<'static, ()> {
 fn set_main_appbar_reservation(main_win: tauri::WebviewWindow, reserve: bool) {
     if reserve {
         register_appbar(main_win);
-    } else if let Ok(hwnd) = main_win.hwnd() {
-        // Ask the shell to remove the reservation unconditionally: the flag
-        // may look clean while the shell still holds the strip.
-        unregister_appbar_native(hwnd);
-        MAIN_APPBAR_REGISTERED.store(false, Ordering::Relaxed);
-        re_assert_topmost(hwnd);
+    } else {
+        if !main_win.is_visible().unwrap_or(false) {
+            let _ = main_win.show();
+        }
+        if let Ok(hwnd) = main_win.hwnd() {
+            // Ask the shell to remove the reservation unconditionally: the flag
+            // may look clean while the shell still holds the strip.
+            unregister_appbar_native(hwnd);
+            MAIN_APPBAR_REGISTERED.store(false, Ordering::Relaxed);
+            re_assert_topmost(hwnd);
+        }
     }
 }
 
@@ -4131,7 +4166,7 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                     let is_browser_pwa = is_browser_host
                         && window_aumid
                             .as_deref()
-                            .map_or(false, crate::commands::is_browser_pwa_aumid);
+                            .is_some_and(crate::commands::is_browser_pwa_aumid);
 
                     let final_name = if ((is_browser_host
                         && (is_browser_pwa || window_aumid.is_none()))

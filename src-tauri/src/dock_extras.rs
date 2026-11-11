@@ -81,8 +81,10 @@ fn icon_for_path(path: &str) -> Option<String> {
 }
 
 unsafe fn stock_icon(full: bool) -> Option<String> {
-    let mut info = SHSTOCKICONINFO::default();
-    info.cbSize = std::mem::size_of::<SHSTOCKICONINFO>() as u32;
+    let mut info = SHSTOCKICONINFO {
+        cbSize: std::mem::size_of::<SHSTOCKICONINFO>() as u32,
+        ..Default::default()
+    };
     SHGetStockIconInfo(
         if full {
             SIID_RECYCLERFULL
@@ -338,8 +340,10 @@ fn recycle_bin_full() -> bool {
             return guard.full;
         }
     }
-    let mut info = SHQUERYRBINFO::default();
-    info.cbSize = std::mem::size_of::<SHQUERYRBINFO>() as u32;
+    let mut info = SHQUERYRBINFO {
+        cbSize: std::mem::size_of::<SHQUERYRBINFO>() as u32,
+        ..Default::default()
+    };
     let full =
         unsafe { SHQueryRecycleBinW(PCWSTR::null(), &mut info) }.is_ok() && info.i64NumItems > 0;
     if let Ok(mut guard) = state.lock() {
@@ -509,6 +513,96 @@ pub async fn eject_dock_extra(path: String) -> Result<(), String> {
     .map_err(|e| e.to_string())?
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct FolderStackItem {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub icon: Option<String>,
+    pub size_bytes: Option<u64>,
+    pub modified_ms: Option<u64>,
+}
+
+#[tauri::command]
+pub async fn get_folder_items(path: String, limit: Option<usize>) -> Result<Vec<FolderStackItem>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::fs;
+        use std::path::Path;
+        use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
+
+        let dir = Path::new(&path);
+        if !dir.is_dir() {
+            return Err(format!("'{}' is not a directory", path));
+        }
+
+        let com_initialized = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED).is_ok() };
+
+        let max_items = limit.unwrap_or(32);
+        let mut entries = Vec::new();
+
+        if let Ok(read_dir) = fs::read_dir(dir) {
+            for entry in read_dir.flatten() {
+                if let Ok(metadata) = entry.metadata() {
+                    let file_name = entry.file_name().to_string_lossy().to_string();
+                    if file_name.starts_with('.')
+                        || file_name.starts_with('$')
+                        || file_name.eq_ignore_ascii_case("desktop.ini")
+                        || file_name.eq_ignore_ascii_case("thumbs.db")
+                    {
+                        continue;
+                    }
+                    let is_dir = metadata.is_dir();
+                    let size_bytes = if is_dir { None } else { Some(metadata.len()) };
+                    let modified_ms = metadata
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_millis() as u64);
+                    let file_path = entry.path().to_string_lossy().to_string();
+
+                    entries.push((file_name, file_path, is_dir, size_bytes, modified_ms));
+                }
+            }
+        }
+
+        // Sort: newest modified first
+        entries.sort_by_key(|b| std::cmp::Reverse(b.4));
+        entries.truncate(max_items);
+
+        let items: Vec<FolderStackItem> = entries
+            .into_iter()
+            .map(|(name, file_path, is_dir, size_bytes, modified_ms)| {
+                let icon = icon_for_path(&file_path);
+                FolderStackItem {
+                    name,
+                    path: file_path,
+                    is_dir,
+                    icon,
+                    size_bytes,
+                    modified_ms,
+                }
+            })
+            .collect();
+
+        if com_initialized {
+            unsafe { CoUninitialize() };
+        }
+
+        Ok(items)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn show_in_folder(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        shell_execute("explorer.exe", Some(&format!("/select,\"{}\"", path)), "open")
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -575,5 +669,20 @@ mod tests {
         );
         assert!(parse_custom_folders("not json").is_empty());
         assert!(parse_custom_folders("[{\"name\":\"x\"}]").is_empty());
+    }
+
+    #[test]
+    fn folder_stack_item_serialization() {
+        let item = FolderStackItem {
+            name: "test.txt".into(),
+            path: "C:\\test.txt".into(),
+            is_dir: false,
+            icon: None,
+            size_bytes: Some(1024),
+            modified_ms: Some(1700000000000),
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        let deserialized: FolderStackItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(item, deserialized);
     }
 }

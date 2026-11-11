@@ -39,9 +39,17 @@
 	mask-image: linear-gradient(var(--surface-bg), var(--surface-bg));
 }
 
-/* Reach over the flares, along the edge. */
-.edge-surface--top,
+/* Reach over the flares, along the edge.
+   For bottom edge (dock), expand 24px upward so the wave crest has headroom
+   inside the container's CSS mask-image without being clipped. */
+.edge-surface--top {
+	left: -13px;
+	right: -13px;
+}
+
 .edge-surface--bottom {
+	top: -24px;
+	bottom: 0;
 	left: -13px;
 	right: -13px;
 }
@@ -64,10 +72,28 @@
 	clip-path: border-box;
 }
 
-.edge-surface--top::before,
-.edge-surface--bottom::before {
+.edge-surface--top::before {
 	left: 13px;
 	right: 13px;
+}
+
+.edge-surface--bottom::before {
+	top: 24px;
+	bottom: 0;
+	left: 13px;
+	right: 13px;
+}
+
+.edge-surface--bottom,
+.edge-surface--bottom::before {
+	border-top-left-radius: 18px !important;
+	border-top-right-radius: 18px !important;
+}
+
+.edge-surface--top,
+.edge-surface--top::before {
+	border-bottom-left-radius: 18px !important;
+	border-bottom-right-radius: 18px !important;
 }
 
 /* A single SVG stroke follows the entire silhouette, including the flares.
@@ -106,13 +132,7 @@
 .edge-surface--bottom .edge-surface-flare {
 	width: 14px;
 	height: 13px;
-	clip-path: shape(
-		from 0 0,
-		curve to 13px 13px with 10px 0 / 13px 3px,
-		line to 14px 13px,
-		line to 14px 0,
-		close
-	);
+	clip-path: path("M 0 0 C 10 0 13 3 13 13 L 14 13 L 14 0 Z");
 }
 
 /* Drawn as the left edge's top flare. */
@@ -120,13 +140,7 @@
 .edge-surface--right .edge-surface-flare {
 	width: 13px;
 	height: 14px;
-	clip-path: shape(
-		from 0 0,
-		curve to 13px 13px with 0 10px / 3px 13px,
-		line to 13px 14px,
-		line to 0 14px,
-		close
-	);
+	clip-path: path("M 0 0 C 0 10 3 13 13 13 L 13 14 L 0 14 Z");
 }
 
 .edge-surface--top .edge-surface-flare {

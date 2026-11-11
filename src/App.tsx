@@ -52,6 +52,7 @@ import {
 	MemoryStick,
 	HardDrive,
 	ArrowUpDown,
+	Bell,
 	BellRing,
 	Play,
 	Pause,
@@ -70,7 +71,17 @@ import {
 	Volume2,
 	SunDim,
 	SunMedium,
-	Sun
+	Sun,
+	Clipboard,
+	Globe,
+	Code,
+	Check,
+	Trash2,
+	FileText,
+	ZoomIn,
+	ZoomOut,
+	Maximize2,
+	Copy
 } from "lucide-react";
 
 /**
@@ -444,6 +455,15 @@ interface ShelfItem {
 	timestamp: number;
 }
 
+interface ClipboardItem {
+	id: string;
+	content: string;
+	kind: "url" | "hex" | "code" | "text" | "image";
+	timestamp: number;
+	width?: number;
+	height?: number;
+}
+
 type BloomMode =
 	| "music"
 	| "calendar"
@@ -451,10 +471,101 @@ type BloomMode =
 	| "announcement"
 	| "status"
 	| "shelf"
+	| "clipboard"
 	| "wifi"
 	| "bluetooth"
 	| "devices"
-	| "device";
+	| "device"
+	| "notification"
+	| "notifications";
+
+export interface AppNotification {
+	id: number;
+	app_name: string;
+	app_id: string;
+	title: string;
+	body: string;
+	timestamp: number;
+}
+
+function formatRelativeTime(timestampSecs: number): string {
+	const diff = Math.floor(Date.now() / 1000 - timestampSecs);
+	if (diff < 60) return "just now";
+	if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+	if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+	return new Date(timestampSecs * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function AppBrandIcon({ appName, appId }: { appName: string; appId: string }) {
+	const lower = (appName + " " + appId).toLowerCase();
+
+	if (lower.includes("whatsapp")) {
+		return (
+			<div className="notif-brand-icon notif-whatsapp" title="WhatsApp">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+					<path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2m.01 1.67c4.54 0 8.24 3.7 8.24 8.24 0 2.2-.86 4.27-2.42 5.82a8.18 8.18 0 0 1-5.82 2.41c-1.42 0-2.82-.37-4.06-1.07l-.29-.17-3.12.82.83-3.04-.19-.3a8.21 8.21 0 0 1-1.26-4.47c0-4.54 3.7-8.24 8.24-8.24m4.52 11.66c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.25-1.5-1.4-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.29.38-.44.12-.14.17-.25.25-.42.08-.17.04-.32-.02-.45s-.56-1.35-.77-1.85c-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1s.9 2.44 1.02 2.61c.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.6.19 1.15.16 1.58.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3" />
+				</svg>
+			</div>
+		);
+	}
+
+	if (lower.includes("telegram")) {
+		return (
+			<div className="notif-brand-icon notif-telegram" title="Telegram">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+					<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38" />
+				</svg>
+			</div>
+		);
+	}
+
+	if (lower.includes("discord")) {
+		return (
+			<div className="notif-brand-icon notif-discord" title="Discord">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+					<path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+				</svg>
+			</div>
+		);
+	}
+
+	if (lower.includes("claude")) {
+		return (
+			<div className="notif-brand-icon notif-claude" title="Claude">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+					<path d="M12 2a1.5 1.5 0 0 1 1.5 1.5v4.086l2.89-2.89a1.5 1.5 0 0 1 2.12 2.122l-2.89 2.89h4.088a1.5 1.5 0 0 1 0 3h-4.088l2.89 2.89a1.5 1.5 0 0 1-2.122 2.12l-2.888-2.888V20.5a1.5 1.5 0 0 1-3 0v-4.088l-2.89 2.89a1.5 1.5 0 1 1-2.12-2.122l2.89-2.89H3.5a1.5 1.5 0 0 1 0-3h4.088L4.7 8.39a1.5 1.5 0 1 1 2.122-2.12l2.888 2.888V3.5A1.5 1.5 0 0 1 12 2z" />
+				</svg>
+			</div>
+		);
+	}
+
+	if (lower.includes("antigravity") || lower.includes("code")) {
+		return (
+			<div className="notif-brand-icon notif-antigravity" title="Antigravity">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+					<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+				</svg>
+			</div>
+		);
+	}
+
+	if (lower.includes("terminal") || lower.includes("powershell") || lower.includes("pwsh") || lower.includes("cmd")) {
+		return (
+			<div className="notif-brand-icon notif-terminal" title="Terminal">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+					<polyline points="4 17 10 11 4 5" />
+					<line x1="12" y1="19" x2="20" y2="19" />
+				</svg>
+			</div>
+		);
+	}
+
+	return (
+		<div className="notif-brand-icon notif-generic">
+			<BellRing size={16} strokeWidth={2.4} />
+		</div>
+	);
+}
 
 // A device that just connected or disconnected, shown briefly in the pill.
 interface DeviceAlert {
@@ -855,6 +966,30 @@ function App() {
 	const timeCenterRef = useRef<HTMLDivElement>(null);
 	const musicBubbleRef = useRef<HTMLButtonElement>(null);
 	const shelfBubbleRef = useRef<HTMLButtonElement>(null);
+	const clipboardBubbleRef = useRef<HTMLButtonElement>(null);
+	const notificationBubbleRef = useRef<HTMLButtonElement>(null);
+	const [activeNotification, setActiveNotification] = useState<AppNotification | null>(null);
+	const [notificationAlertOnScreen, setNotificationAlertOnScreen] = useState(false);
+	const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+	const notificationAlertTimerRef = useRef<any>(null);
+	const notificationQueueRef = useRef<AppNotification[]>([]);
+	const activeNotificationRef = useRef<AppNotification | null>(null);
+	activeNotificationRef.current = activeNotification;
+	const [notificationHistory, setNotificationHistory] = useState<AppNotification[]>(() => {
+		try {
+			const stored = localStorage.getItem("bloom-notification-history");
+			return stored ? JSON.parse(stored) : [];
+		} catch {
+			return [];
+		}
+	});
+	const shelfHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const clipboardHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const notificationHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const [clipboardItems, setClipboardItems] = useState<ClipboardItem[]>([]);
+	const [copiedId, setCopiedId] = useState<string | null>(null);
+	const [zoomedImageItem, setZoomedImageItem] = useState<ClipboardItem | null>(null);
+	const [imageZoomLevel, setImageZoomLevel] = useState(1);
 	const reportNotchRect = useRef<() => void>(() => {});
 	// The pill's target box in window CSS px, and the sender that applies the
 	// notch window's region (holding earlier regions while it shrinks).
@@ -897,6 +1032,7 @@ function App() {
 	const isHidden =
 		!startupAnimating &&
 		!deviceAlertOnScreen &&
+		!notificationAlertOnScreen &&
 		((notchMode === "smart" && isOverlapped && interactionState === "none") ||
 			(notchMode === "peek" && interactionState === "none" && !eventPeek));
 
@@ -929,13 +1065,20 @@ function App() {
 		const updateRect = () => {
 			if (bloomRef.current && windowLabel === "main") {
 				// Activity bubbles sit beside the pill and must stay clickable too.
-				const rects = [bloomRef.current, musicBubbleRef.current, shelfBubbleRef.current]
+				const rects = [bloomRef.current, musicBubbleRef.current, shelfBubbleRef.current, clipboardBubbleRef.current, notificationBubbleRef.current]
 					.filter((el): el is NonNullable<typeof el> => el !== null)
 					.map((el) => el.getBoundingClientRect());
-				const left = Math.min(...rects.map((r) => r.left));
-				const top = Math.min(...rects.map((r) => r.top));
-				const right = Math.max(...rects.map((r) => r.right));
-				const bottom = Math.max(...rects.map((r) => r.bottom));
+				const targetW = getDynamicWidth();
+				const targetH = getDynamicHeight();
+				const targetLeft = (window.innerWidth - targetW) / 2;
+				const targetRight = targetLeft + targetW;
+				const targetTop = 0;
+				const targetBottom = targetH;
+
+				const left = Math.min(targetLeft, ...rects.map((r) => r.left));
+				const top = Math.min(targetTop, ...rects.map((r) => r.top));
+				const right = Math.max(targetRight, ...rects.map((r) => r.right));
+				const bottom = Math.max(targetBottom, ...rects.map((r) => r.bottom));
 				invoke("update_notch_rect", {
 					rect: {
 						x: Math.round(left),
@@ -976,7 +1119,11 @@ function App() {
 			const checkVisibility = async () => {
 				try {
 					const win = getCurrentWebviewWindow();
-					const visible = await win.isVisible();
+					let visible = await win.isVisible();
+					if (!visible) {
+						await win.show().catch(() => {});
+						visible = await win.isVisible();
+					}
 					if (visible) {
 						setStartupAnimating(true);
 						setIsReady(true);
@@ -1101,7 +1248,7 @@ function App() {
 		() => localStorage.getItem("bloom-music-compact-notch") !== "false"
 	);
 	const [shelfPersist, setShelfPersist] = useState(
-		() => localStorage.getItem("bloom-shelf-persist") === "true"
+		() => localStorage.getItem("bloom-shelf-persist") !== "false"
 	);
 	const [settingsVisualizerEnabled, setSettingsVisualizerEnabled] = useState(
 		() => localStorage.getItem("bloom-visualizer-enabled") !== "false"
@@ -1164,7 +1311,7 @@ function App() {
 					(getVal("bloom-notch-remember-panel") ?? getVal("bloom-notch-click-to-open", "true")) !== "false"
 				);
 				setDefaultPanel(asNotchPanel(getVal("bloom-notch-default-panel")) ?? "calendar");
-				setShelfPersist(getVal("bloom-shelf-persist", "false") === "true");
+				setShelfPersist(getVal("bloom-shelf-persist", "true") !== "false");
 				setSettingsMusicCompactNotch(getVal("bloom-music-compact-notch", "true") !== "false");
 				setLastPanel(asNotchPanel(getVal("bloom-notch-last-panel")));
 				const viz =
@@ -1442,6 +1589,27 @@ function App() {
 		}
 	}, [shelfItems, shelfPersist]);
 
+	useEffect(() => {
+		invoke<ClipboardItem[]>("get_clipboard_history")
+			.then((items) => {
+				if (Array.isArray(items)) setClipboardItems(items);
+			})
+			.catch(() => {});
+
+		const unlisten = listen<ClipboardItem[]>("clipboard-update", (event) => {
+			if (Array.isArray(event.payload)) {
+				setClipboardItems(event.payload);
+			}
+		});
+
+		return () => {
+			unlisten.then((f) => f()).catch(() => {});
+			if (shelfHoverTimer.current) clearTimeout(shelfHoverTimer.current);
+			if (clipboardHoverTimer.current) clearTimeout(clipboardHoverTimer.current);
+			if (notificationHoverTimer.current) clearTimeout(notificationHoverTimer.current);
+		};
+	}, []);
+
 	// Drop file references whose files are gone (moved/deleted/drive unplugged)
 	// once at startup, so a persisted shelf does not accumulate dead entries.
 	// Text items are always kept.
@@ -1661,6 +1829,8 @@ function App() {
 		}
 		setIsHovered(false);
 		setIsNotchHovered(false);
+		setZoomedImageItem(null);
+		setImageZoomLevel(1);
 		if (isOpenRef.current) {
 			const panel = asNotchPanel(bloomModeRef.current);
 			if (panel && rememberPanelEnabledRef.current) rememberPanelRef.current(panel);
@@ -1672,9 +1842,11 @@ function App() {
 			prev === "calendar" ||
 			prev === "status" ||
 			prev === "shelf" ||
+			prev === "clipboard" ||
 			prev === "wifi" ||
 			prev === "bluetooth" ||
-			prev === "devices"
+			prev === "devices" ||
+			prev === "notifications"
 				? restingModeRef.current
 				: prev
 		);
@@ -1906,11 +2078,17 @@ function App() {
 
 	const lastScrollTime = useRef(0);
 	const handleWheel = (e: React.WheelEvent) => {
+		if (bloomMode === "clipboard" || bloomMode === "shelf" || bloomMode === "notifications") {
+			return;
+		}
 		const target = e.target as HTMLElement;
 		if (
 			target.closest(".calendar-container") ||
 			target.closest(".timer-column") ||
 			target.closest(".shelf-content") ||
+			target.closest(".clipboard-content") ||
+			target.closest(".notif-center-list") ||
+			target.closest(".notification-center-content") ||
 			target.closest(".qp-list")
 		) {
 			return;
@@ -2160,7 +2338,11 @@ function App() {
 	const collapsedMode = musicActivity && !timerActive ? "music" : "status";
 	const showMusicBubble = musicActivity && timerActive && !isOpen && isVisible && !isHidden;
 	const showShelfBubble =
-		shelfItems.length > 0 && !isOpen && isVisible && !isHidden && bloomMode !== "announcement";
+		shelfItems.length > 0 && !isOpen && isVisible && !isHidden && bloomMode !== "announcement" && bloomMode !== "shelf";
+	const showClipboardBubble =
+		clipboardItems.length > 0 && !isOpen && isVisible && !isHidden && bloomMode !== "announcement" && bloomMode !== "clipboard";
+	const showNotificationBubble =
+		notificationHistory.length > 0 && !isOpen && isVisible && !isHidden && bloomMode !== "announcement" && bloomMode !== "notifications";
 	restingModeRef.current = collapsedMode;
 	bloomModeRef.current = bloomMode;
 
@@ -2173,7 +2355,7 @@ function App() {
 	};
 
 	// Expands the notch into a panel, or into an activity's own view.
-	const openNotch = (view: NotchPanel | "music" | "shelf") => {
+	const openNotch = (view: NotchPanel | "music" | "shelf" | "clipboard" | "notifications") => {
 		if (bloomMode === "announcement") return;
 		setIsOpen(true);
 		setBloomMode(view);
@@ -2265,7 +2447,7 @@ function App() {
 	};
 	const showDeviceAlert = useCallback((alert: Omit<DeviceAlert, "runId">) => {
 		const mode = bloomModeRef.current;
-		if (isOpenRef.current || mode === "announcement" || mode === "shelf") return;
+		if (isOpenRef.current || mode === "announcement" || mode === "shelf" || mode === "clipboard") return;
 		const current = deviceAlertRef.current;
 		if (current && current.id !== alert.id) {
 			const queue = deviceAlertQueueRef.current.filter((queued) => queued.id !== alert.id);
@@ -2386,6 +2568,101 @@ function App() {
 		// openingPanel only reads settings state already in this render.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [bloomMode, deviceAlert, collapsedMode]);
+
+	// Notification alert presentation & queue
+	const presentNotificationRef = useRef<(notif: AppNotification) => void>(() => {});
+	const dismissActiveNotification = useCallback(() => {
+		if (notificationAlertTimerRef.current) clearTimeout(notificationAlertTimerRef.current);
+		const next = notificationQueueRef.current.shift();
+		if (next && !isOpenRef.current) {
+			presentNotificationRef.current(next);
+		} else {
+			setActiveNotification(null);
+			setNotificationAlertOnScreen(false);
+			setBloomMode(isOpenRef.current ? openingPanel() : collapsedMode);
+		}
+	}, [collapsedMode, openingPanel]);
+
+	presentNotificationRef.current = (notif: AppNotification) => {
+		setActiveNotification(notif);
+		setNotificationAlertOnScreen(true);
+		setBloomMode("notification");
+		if (notchMode === "peek") triggerEventPeek(7000);
+		if (notificationAlertTimerRef.current) clearTimeout(notificationAlertTimerRef.current);
+		notificationAlertTimerRef.current = setTimeout(() => {
+			dismissActiveNotification();
+		}, 7000);
+	};
+
+	const showNotification = useCallback(
+		(notif: AppNotification) => {
+			setUnreadNotificationCount((c) => c + 1);
+			setNotificationHistory((prev) => {
+				const next = [notif, ...prev.filter((n) => n.id !== notif.id)].slice(0, 50);
+				try {
+					localStorage.setItem("bloom-notification-history", JSON.stringify(next));
+				} catch {}
+				return next;
+			});
+
+			if (
+				isOpenRef.current ||
+				bloomModeRef.current === "announcement" ||
+				bloomModeRef.current === "notifications" ||
+				zoomedImageItem
+			) {
+				notificationQueueRef.current.push(notif);
+				return;
+			}
+			if (activeNotificationRef.current) {
+				notificationQueueRef.current.push(notif);
+				return;
+			}
+			presentNotificationRef.current(notif);
+		},
+		[zoomedImageItem]
+	);
+
+	const deleteNotification = (id: number) => {
+		setNotificationHistory((prev) => {
+			const next = prev.filter((n) => n.id !== id);
+			try {
+				localStorage.setItem("bloom-notification-history", JSON.stringify(next));
+			} catch {}
+			return next;
+		});
+		invoke("dismiss_notification", { id }).catch(() => {});
+	};
+
+	const clearAllNotifications = () => {
+		setNotificationHistory([]);
+		setUnreadNotificationCount(0);
+		try {
+			localStorage.removeItem("bloom-notification-history");
+		} catch {}
+	};
+
+	useEffect(() => {
+		if (windowLabel !== "main") return;
+		const unlisten = listen<AppNotification>("app-notification", ({ payload }) => {
+			showNotification(payload);
+		});
+		return () => {
+			unlisten.then((f) => f());
+		};
+	}, [showNotification, windowLabel]);
+
+	useEffect(() => {
+		if (activeNotification) return;
+		const timer = setTimeout(() => setNotificationAlertOnScreen(false), 400);
+		return () => clearTimeout(timer);
+	}, [activeNotification]);
+
+	useEffect(() => {
+		if (bloomMode === "notification" && !activeNotification) {
+			setBloomMode(isOpenRef.current ? openingPanel() : collapsedMode);
+		}
+	}, [bloomMode, activeNotification, collapsedMode, openingPanel]);
 
 	// The collapsed notch always shows its current live activity: music while a
 	// session exists, the timer (with music in its bubble) once one is set, and
@@ -3088,8 +3365,14 @@ function App() {
 	const getDynamicWidth = () => {
 		if (bloomMode === "announcement" && announcement && !announcementDismissed) return 380;
 		if (bloomMode === "device" && deviceAlert) return 330;
+		if (bloomMode === "notification" && activeNotification) return 390;
+		if (bloomMode === "notifications") return 400;
 		if (isCalendarMode) return 480;
 		if (bloomMode === "shelf") return 380;
+		if (bloomMode === "clipboard") {
+			if (zoomedImageItem) return 520;
+			return clipboardItems.length <= 1 ? 320 : 490;
+		}
 		if (bloomMode === "command-center" && isOpen) return COMMAND_CENTER_WIDTH;
 		if (bloomMode === "wifi" || bloomMode === "bluetooth") return COMMAND_CENTER_WIDTH;
 		if (bloomMode === "devices") return 350;
@@ -3122,14 +3405,29 @@ function App() {
 		}
 		// Device alert: the drawing, with room for its motion.
 		if (bloomMode === "device" && deviceAlert) return 76;
+		if (bloomMode === "notification" && activeNotification) {
+			return activeNotification.body ? 64 : 50;
+		}
+		if (bloomMode === "notifications") {
+			if (notificationHistory.length === 0) return 170;
+			if (notificationHistory.length === 1) return 160;
+			if (notificationHistory.length === 2) return 235;
+			if (notificationHistory.length === 3) return 315;
+			return 390;
+		}
 		// Sized to the calendar's week-row count plus the timer's fixed content.
 		if (bloomMode === "calendar") return 112 + calendarRows(calendarMonth, calendarMondayFirst) * 30;
 		// Shelf expands on mode alone (no hover needed: there is no cursor
 		// hover during an OS drag) and is sized to exactly one row of tiles,
 		// plus room for the scrollbar once the tiles overflow it.
 		if (bloomMode === "shelf") {
-			if (shelfItems.length === 0) return 130;
-			return shelfOverflowing ? 190 : 176;
+			return shelfItems.length === 0 ? 140 : 196;
+		}
+		if (bloomMode === "clipboard") {
+			if (zoomedImageItem) return 340;
+			if (clipboardItems.length === 0) return 130;
+			const rows = Math.min(Math.max(1, Math.ceil(clipboardItems.length / 2)), 5);
+			return Math.round(82 + rows * 41);
 		}
 		if (bloomMode === "command-center") return isOpen ? 230 : 36;
 		if (bloomMode === "devices") {
@@ -3190,6 +3488,20 @@ function App() {
 		if (windowLabel === "main") updateNotchRegion();
 	});
 
+	// Side-by-side positioning for activity bubbles on the right of the collapsed notch
+	const notifBubbleCount = unreadNotificationCount > 0 ? unreadNotificationCount : notificationHistory.length;
+	const notifBubbleWidth = notifBubbleCount >= 100 ? 56 : notifBubbleCount >= 10 ? 49 : 42;
+	const clipBubbleWidth = clipboardItems.length >= 100 ? 56 : clipboardItems.length >= 10 ? 49 : 42;
+
+	const notificationBubbleMarginLeft = getDynamicWidth() / 2 + 8;
+	const clipboardBubbleMarginLeft =
+		getDynamicWidth() / 2 + 8 + (showNotificationBubble ? notifBubbleWidth + 6 : 0);
+	const musicBubbleMarginLeft =
+		getDynamicWidth() / 2 +
+		8 +
+		(showNotificationBubble ? notifBubbleWidth + 6 : 0) +
+		(showClipboardBubble ? clipBubbleWidth + 6 : 0);
+
 	return (
 		<div className="screen" style={{ overflow: "hidden" }}>
 			{/* Screen Corners (Top) */}
@@ -3226,7 +3538,10 @@ function App() {
 					ref={bloomRef}
 					className={`bloom ${isHovered ? "expanded" : ""} ${isImpacted ? "is-impacted" : ""} ${isDragHovering ? "drag-hover" : ""}`}
 					onMouseEnter={() => setIsNotchHovered(true)}
-					onMouseLeave={() => setIsNotchHovered(false)}
+					onMouseLeave={() => {
+						setIsNotchHovered(false);
+						releaseNotchHover();
+					}}
 					onWheel={handleWheel}
 					initial={{
 						y: 250,
@@ -3595,8 +3910,8 @@ function App() {
 										>
 											<div
 												className="main-row"
-												// A device alert covers the whole pill.
-												style={bloomMode === "device" || deviceAlertOnScreen ? { visibility: "hidden" } : undefined}
+												// A device alert or notification covers the whole pill.
+												style={bloomMode === "device" || deviceAlertOnScreen || bloomMode === "notification" || notificationAlertOnScreen ? { visibility: "hidden" } : undefined}
 											>
 												<AnimatePresence mode="wait">
 													{(showPowerPulse || showLowBatteryPulse || showUpdatePulse) &&
@@ -4241,6 +4556,85 @@ function App() {
 									)}
 								</AnimatePresence>
 
+								{/* Notification alert banner: WhatsApp, Telegram, Discord, Antigravity, Claude, etc. */}
+								<AnimatePresence
+									onExitComplete={() =>
+										setNotificationAlertOnScreen(
+											activeNotificationRef.current !== null || notificationQueueRef.current.length > 0
+										)
+									}
+								>
+									{bloomMode === "notification" && activeNotification && (
+										<motion.div
+											className="notification-island-alert"
+											initial={{ opacity: 0, scale: 0.94, y: -4 }}
+											animate={{ opacity: 1, scale: 1, y: 0 }}
+											exit={{
+												opacity: 0,
+												scale: 0.94,
+												filter: "blur(4px)",
+												transition: { duration: 0.15 }
+											}}
+											transition={{ type: "spring", stiffness: 420, damping: 28 }}
+											onClick={(e) => {
+												e.stopPropagation();
+												invoke("focus_notification_app", {
+													appName: activeNotification.app_name,
+													appId: activeNotification.app_id
+												}).catch(() => {});
+												dismissActiveNotification();
+											}}
+											onMouseEnter={() => {
+												if (notificationAlertTimerRef.current)
+													clearTimeout(notificationAlertTimerRef.current);
+											}}
+											onMouseLeave={() => {
+												if (notificationAlertTimerRef.current)
+													clearTimeout(notificationAlertTimerRef.current);
+												notificationAlertTimerRef.current = setTimeout(() => {
+													dismissActiveNotification();
+												}, 3000);
+											}}
+										>
+											<div className="notification-island-badge">
+												<AppBrandIcon
+													appName={activeNotification.app_name}
+													appId={activeNotification.app_id}
+												/>
+											</div>
+											<div className="notification-island-text">
+												<div className="notification-island-top">
+													<span className="notification-island-app">
+														{activeNotification.app_name}
+													</span>
+													<span className="notification-island-dot">•</span>
+													<span className="notification-island-time">now</span>
+												</div>
+												<div className="notification-island-title">
+													{activeNotification.title}
+												</div>
+												{activeNotification.body ? (
+													<div className="notification-island-body">
+														{activeNotification.body}
+													</div>
+												) : null}
+											</div>
+											<button
+												type="button"
+												className="notification-island-close"
+												onClick={(e) => {
+													e.stopPropagation();
+													invoke("dismiss_notification", { id: activeNotification.id }).catch(() => {});
+													dismissActiveNotification();
+												}}
+												aria-label="Dismiss notification"
+											>
+												<X size={13} strokeWidth={2.4} />
+											</button>
+										</motion.div>
+									)}
+								</AnimatePresence>
+
 								{/* Announcement Card */}
 								<AnimatePresence>
 									{bloomMode === "announcement" && announcement && !announcementDismissed && (
@@ -4413,104 +4807,518 @@ function App() {
 											transition={{ type: "spring", stiffness: 400, damping: 30 }}
 										>
 											{shelfNotice && <div className="shelf-notice">{shelfNotice}</div>}
+											<div className="shelf-header-clean">
+												<div className="shelf-header-title">
+													<Inbox size={13} strokeWidth={2.2} />
+													<span>Drop Shelf</span>
+													{shelfItems.length > 0 && <span className="shelf-header-badge">{shelfItems.length}</span>}
+												</div>
+												{shelfItems.length > 0 && (
+													<button
+														type="button"
+														className="shelf-clear-btn"
+														onClick={() => {
+															setShelfItems([]);
+															if (shelfPersist) localStorage.removeItem("bloom-shelf-items");
+														}}
+														title="Clear shelf files"
+													>
+														<Trash2 size={12} />
+														<span>Clear</span>
+													</button>
+												)}
+											</div>
 											{shelfItems.length === 0 ? (
 												<div className="shelf-empty">
 													<span>Drop files or selected text here</span>
 												</div>
 											) : (
-												<div
-													className={`shelf-items-grid ${shelfOverflowing ? "overflowing" : ""}`}
-													ref={shelfGridRef}
-												>
-													<AnimatePresence mode="popLayout" onExitComplete={measureShelfOverflow}>
-														{shelfItems.map((item) => {
-															const preview = item.path ? shelfThumbs[item.path] : undefined;
-															const thumb = preview?.thumb;
-															return (
-																<motion.div
-																	key={item.id}
-																	layout
-																	initial={
-																		shelfNewIdsRef.current.has(item.id)
-																			? { opacity: 0, scale: 0.82 }
-																			: false
-																	}
-																	animate={{ opacity: 1, scale: 1 }}
-																	exit={{
-																		opacity: 0,
-																		scale: 0.82,
-																		transition: { duration: 0.16, ease: "easeOut" }
-																	}}
-																	transition={{
-																		type: "spring",
-																		stiffness: 520,
-																		damping: 38,
-																		mass: 0.7
-																	}}
-																	className={`shelf-tile ${item.type === "text" || (!thumb && preview?.text) ? "is-text" : ""}`}
-																	title={
-																		item.type === "text" ? item.text?.slice(0, 1000) : item.path
-																	}
-																	onPointerDown={(e) => handleShelfPointerDown(e, item)}
-																	onPointerMove={(e) => handleShelfPointerMove(e, item)}
-																	onClick={(e) => handleShelfTileClick(e, item)}
-																>
-																	<div className="shelf-tile-preview">
-																		{item.type === "text" ? (
-																			<div className="shelf-tile-text">
-																				<Type
-																					size={11}
-																					strokeWidth={2}
-																					className="shelf-tile-text-icon"
-																				/>
-																				<span className="shelf-tile-text-body">{item.text}</span>
-																			</div>
-																		) : !thumb && preview?.text ? (
-																			// A document or text file: its opening text,
-																			// marked with its type's icon.
-																			<div className="shelf-tile-text">
-																				<ShelfTypeIcon
-																					name={item.name}
-																					folder={false}
-																					size={11}
-																					className="shelf-tile-text-icon"
-																				/>
-																				<span className="shelf-tile-text-body">{preview.text}</span>
-																			</div>
-																		) : (
-																			<>
-																				<div className="shelf-tile-placeholder">
-																					{preview && !thumb ? (
-																						<ShelfTypeIcon
-																							name={item.name}
-																							folder={preview.folder}
-																						/>
-																					) : null}
-																				</div>
-																				{thumb ? (
-																					<img src={thumb} alt="" draggable={false} />
-																				) : null}
-																			</>
-																		)}
-																	</div>
-																	<span className="shelf-tile-name">
-																		{item.type === "text"
-																			? `Text · ${item.text?.length ?? 0} chars`
-																			: item.name}
-																	</span>
-																	<button
-																		className="shelf-tile-remove"
-																		title="Remove from shelf"
-																		onClick={(e) => {
-																			e.stopPropagation();
-																			removeShelfItem(item.id);
+													<div
+														className={`shelf-items-grid ${shelfOverflowing ? "overflowing" : ""}`}
+														ref={shelfGridRef}
+													>
+														<AnimatePresence mode="popLayout" onExitComplete={measureShelfOverflow}>
+															{shelfItems.map((item) => {
+																const preview = item.path ? shelfThumbs[item.path] : undefined;
+																const thumb = preview?.thumb;
+																return (
+																	<motion.div
+																		key={item.id}
+																		layout
+																		initial={
+																			shelfNewIdsRef.current.has(item.id)
+																				? { opacity: 0, scale: 0.82 }
+																				: false
+																		}
+																		animate={{ opacity: 1, scale: 1 }}
+																		exit={{
+																			opacity: 0,
+																			scale: 0.82,
+																			transition: { duration: 0.16, ease: "easeOut" }
 																		}}
+																		transition={{
+																			type: "spring",
+																			stiffness: 520,
+																			damping: 38,
+																			mass: 0.7
+																		}}
+																		className={`shelf-tile ${item.type === "text" || (!thumb && preview?.text) ? "is-text" : ""}`}
+																		title={
+																			item.type === "text" ? item.text?.slice(0, 1000) : item.path
+																		}
+																		onPointerDown={(e) => handleShelfPointerDown(e, item)}
+																		onPointerMove={(e) => handleShelfPointerMove(e, item)}
+																		onClick={(e) => handleShelfTileClick(e, item)}
 																	>
-																		<X size={11} strokeWidth={2.5} />
-																	</button>
-																</motion.div>
-															);
-														})}
+																		<div className="shelf-tile-preview">
+																			{item.type === "text" ? (
+																				<div className="shelf-tile-text">
+																					<Type
+																						size={11}
+																						strokeWidth={2}
+																						className="shelf-tile-text-icon"
+																					/>
+																					<span className="shelf-tile-text-body">{item.text}</span>
+																				</div>
+																			) : !thumb && preview?.text ? (
+																				<div className="shelf-tile-text">
+																					<ShelfTypeIcon
+																						name={item.name}
+																						folder={false}
+																						size={11}
+																						className="shelf-tile-text-icon"
+																					/>
+																					<span className="shelf-tile-text-body">{preview.text}</span>
+																				</div>
+																			) : (
+																				<>
+																					<div className="shelf-tile-placeholder">
+																						{preview && !thumb ? (
+																							<ShelfTypeIcon
+																								name={item.name}
+																								folder={preview.folder}
+																							/>
+																						) : null}
+																					</div>
+																					{thumb ? (
+																						<img src={thumb} alt="" draggable={false} />
+																					) : null}
+																				</>
+																			)}
+																		</div>
+																		<span className="shelf-tile-name">
+																			{item.type === "text"
+																				? `Text · ${item.text?.length ?? 0} chars`
+																				: item.name}
+																		</span>
+																		<button
+																			className="shelf-tile-remove"
+																			title="Remove from shelf"
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				removeShelfItem(item.id);
+																			}}
+																		>
+																			<X size={11} strokeWidth={2.5} />
+																		</button>
+																	</motion.div>
+																);
+															})}
+														</AnimatePresence>
+													</div>
+												)}
+										</motion.div>
+									)}
+								</AnimatePresence>
+
+								{/* Clipboard Stream Panel */}
+								<AnimatePresence>
+									{bloomMode === "clipboard" && (
+										<motion.div
+											className="clipboard-content"
+											onClick={(e) => e.stopPropagation()}
+											initial={{ opacity: 0 }}
+											animate={{ opacity: 1 }}
+											exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
+											transition={{ type: "spring", stiffness: 400, damping: 30 }}
+										>
+											{zoomedImageItem ? (
+												<div className="clip-image-viewer">
+													<div className="clip-image-viewer-header">
+														<button
+															type="button"
+															className="clip-image-viewer-back-btn"
+															onClick={() => setZoomedImageItem(null)}
+															title="Back to clipboard list"
+														>
+															<ChevronLeft size={14} strokeWidth={2.5} />
+															<span>Back</span>
+														</button>
+														<div className="clip-image-viewer-dims">
+															{zoomedImageItem.width && zoomedImageItem.height
+																? `${zoomedImageItem.width} × ${zoomedImageItem.height} px`
+																: "Image Clip"}
+														</div>
+														<div className="clip-image-viewer-actions">
+															<button
+																type="button"
+																className="clip-image-viewer-tool-btn"
+																onClick={() => setImageZoomLevel((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}
+																title="Zoom out"
+																disabled={imageZoomLevel <= 0.5}
+															>
+																<ZoomOut size={12} strokeWidth={2.4} />
+															</button>
+															<button
+																type="button"
+																className="clip-image-viewer-tool-btn zoom-val"
+																onClick={() => setImageZoomLevel(1)}
+																title="Reset zoom to 100%"
+															>
+																<span>{Math.round(imageZoomLevel * 100)}%</span>
+															</button>
+															<button
+																type="button"
+																className="clip-image-viewer-tool-btn"
+																onClick={() => setImageZoomLevel((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))}
+																title="Zoom in"
+																disabled={imageZoomLevel >= 3}
+															>
+																<ZoomIn size={12} strokeWidth={2.4} />
+															</button>
+															<button
+																type="button"
+																className={`clip-image-viewer-copy-btn ${copiedId === zoomedImageItem.id ? "copied" : ""}`}
+																onClick={async () => {
+																	try {
+																		await invoke("copy_clipboard_item", { id: zoomedImageItem.id });
+																	} catch (_) {}
+																	setCopiedId(zoomedImageItem.id);
+																	setTimeout(() => setCopiedId(null), 1200);
+																}}
+																title="Copy image to clipboard"
+															>
+																{copiedId === zoomedImageItem.id ? (
+																	<>
+																		<Check size={11} strokeWidth={3} />
+																		<span>Copied</span>
+																	</>
+																) : (
+																	<>
+																		<Copy size={11} strokeWidth={2.4} />
+																		<span>Copy</span>
+																	</>
+																)}
+															</button>
+														</div>
+													</div>
+													<div
+														className="clip-image-viewer-stage"
+														onWheel={(e) => {
+															e.stopPropagation();
+															if (e.deltaY < 0) {
+																setImageZoomLevel((z) => Math.min(3, Math.round((z + 0.2) * 100) / 100));
+															} else if (e.deltaY > 0) {
+																setImageZoomLevel((z) => Math.max(0.5, Math.round((z - 0.2) * 100) / 100));
+															}
+														}}
+													>
+														<div
+															className="clip-image-viewer-viewport"
+															style={{
+																transform: `scale(${imageZoomLevel})`,
+																cursor: imageZoomLevel > 1 ? "grab" : "zoom-in"
+															}}
+															onClick={() => setImageZoomLevel((z) => (z >= 2 ? 1 : z + 0.5))}
+														>
+															<img
+																src={zoomedImageItem.content}
+																alt="Zoomed Clip"
+																className="clip-image-viewer-img"
+																draggable={false}
+															/>
+														</div>
+													</div>
+												</div>
+											) : (
+												<>
+													<div className="shelf-header-clean">
+														<div className="shelf-header-title">
+															<Clipboard size={13} strokeWidth={2.2} />
+															<span>Clipboard</span>
+															{clipboardItems.length > 0 && <span className="shelf-header-badge">{clipboardItems.length}</span>}
+														</div>
+														{clipboardItems.length > 0 && (
+															<button
+																type="button"
+																className="shelf-clear-btn"
+																onClick={() => invoke("clear_clipboard_history").catch(() => {})}
+																title="Clear clipboard history"
+															>
+																<Trash2 size={12} />
+																<span>Clear</span>
+															</button>
+														)}
+													</div>
+													{clipboardItems.length === 0 ? (
+														<div className="shelf-empty">
+															<span>No recent clips yet — copy text, links, or images</span>
+														</div>
+													) : (
+														<div className="clip-stream-grid">
+															<AnimatePresence mode="popLayout">
+																{clipboardItems.map((item) => {
+																	const isCopied = copiedId === item.id;
+																	const isImage = item.kind === "image";
+																	const getClipSnippet = () => {
+																		if (isImage) {
+																			return item.width && item.height
+																				? `Image ${item.width}×${item.height}`
+																				: "Copied Image";
+																		}
+																		if (item.kind === "hex") return item.content;
+																		if (item.kind === "url") {
+																			try {
+																				const u = new URL(
+																					item.content.startsWith("http")
+																						? item.content
+																						: `https://${item.content}`
+																				);
+																				const host = u.hostname.replace(/^www\./, "");
+																				const path = u.pathname.replace(/\/$/, "");
+																				return path && path !== "/" ? `${host}${path}` : host;
+																			} catch {
+																				return item.content.slice(0, 22);
+																			}
+																		}
+																		const words = item.content.trim().split(/\s+/).filter(Boolean);
+																		if (words.length <= 5) return words.join(" ");
+																		return words.slice(0, 5).join(" ") + "…";
+																	};
+																	return (
+																		<motion.div
+																			key={item.id}
+																			layout
+																			initial={{ opacity: 0, scale: 0.94 }}
+																			animate={{ opacity: 1, scale: 1 }}
+																			exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.1 } }}
+																			className={`clip-cell ${isImage ? "is-image" : ""} ${isCopied ? "copied" : ""}`}
+																			onClick={async (e) => {
+																				e.stopPropagation();
+																				try {
+																					await invoke("copy_clipboard_item", { id: item.id });
+																				} catch (_) {
+																					if (!isImage) {
+																						try {
+																							await writeText(item.content);
+																						} catch {
+																							await navigator.clipboard.writeText(item.content).catch(() => {});
+																						}
+																					}
+																				}
+																				setCopiedId(item.id);
+																				setTimeout(() => {
+																					setCopiedId(null);
+																					releaseNotchHover();
+																				}, 700);
+																			}}
+																		>
+																			{isImage ? (
+																				<div
+																					className="clip-cell-thumb-wrap"
+																					onClick={(e) => {
+																						e.stopPropagation();
+																						setZoomedImageItem(item);
+																						setImageZoomLevel(1);
+																					}}
+																					title="Click to zoom image"
+																				>
+																					<img
+																						src={item.content}
+																						className="clip-cell-thumb"
+																						alt="Clip"
+																						draggable={false}
+																					/>
+																					<div className="clip-cell-thumb-zoom-badge">
+																						<Maximize2 size={9} strokeWidth={2.8} />
+																					</div>
+																				</div>
+																			) : item.kind === "hex" ? (
+																				<span
+																					className="clip-cell-swatch"
+																					style={{ background: item.content }}
+																				/>
+																			) : item.kind === "url" ? (
+																				<span className="clip-cell-icon url">
+																					<Globe size={11} strokeWidth={2.4} />
+																				</span>
+																			) : item.kind === "code" ? (
+																				<span className="clip-cell-icon code">
+																					<Code size={11} strokeWidth={2.4} />
+																				</span>
+																			) : (
+																				<span className="clip-cell-icon text">
+																					<FileText size={11} strokeWidth={2.4} />
+																				</span>
+																			)}
+
+																			<span className={`clip-cell-text ${item.kind}`}>
+																				{getClipSnippet()}
+																			</span>
+
+																			{isCopied ? (
+																				<span className="clip-cell-copied">
+																					<Check size={10} strokeWidth={2.8} />
+																					<span>Copied</span>
+																				</span>
+																			) : (
+																				<div className="clip-cell-actions">
+																					{isImage && (
+																						<button
+																							type="button"
+																							className="clip-cell-zoom"
+																							title="Zoom image"
+																							onClick={(e) => {
+																								e.stopPropagation();
+																								setZoomedImageItem(item);
+																								setImageZoomLevel(1);
+																							}}
+																						>
+																							<Maximize2 size={10} strokeWidth={2.5} />
+																						</button>
+																					)}
+																					<button
+																						type="button"
+																						className="clip-cell-delete"
+																						title="Remove clip"
+																						onClick={(e) => {
+																							e.stopPropagation();
+																							invoke("remove_clipboard_item", { id: item.id }).catch(() => {});
+																						}}
+																					>
+																						<X size={10} strokeWidth={2.5} />
+																					</button>
+																				</div>
+																			)}
+																		</motion.div>
+																	);
+																})}
+															</AnimatePresence>
+														</div>
+													)}
+												</>
+											)}
+										</motion.div>
+									)}
+								</AnimatePresence>
+
+								{/* Notification Center Panel */}
+								<AnimatePresence>
+									{bloomMode === "notifications" && (
+										<motion.div
+											className="notification-center-content"
+											onClick={(e) => e.stopPropagation()}
+											initial={{ opacity: 0 }}
+											animate={{ opacity: 1 }}
+											exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
+											transition={{ type: "spring", stiffness: 400, damping: 30 }}
+										>
+											<div className="notif-center-header">
+												<div className="notif-center-title-group">
+													<BellRing size={13} className="notif-center-icon" />
+													<span className="notif-center-title">Notifications</span>
+													{notificationHistory.length > 0 && (
+														<span className="notif-center-badge">{notificationHistory.length}</span>
+													)}
+												</div>
+												<div className="notif-center-actions">
+													{notificationHistory.length > 0 && (
+														<button
+															type="button"
+															className="notif-center-clear-btn"
+															onClick={clearAllNotifications}
+															title="Clear all notifications"
+														>
+															<Trash2 size={12} strokeWidth={2.2} />
+															<span>Clear all</span>
+														</button>
+													)}
+													<button
+														type="button"
+														className="notif-center-close-btn"
+														onClick={() => {
+															setIsOpen(false);
+															setBloomMode(collapsedMode);
+														}}
+														title="Close"
+													>
+														<X size={13} strokeWidth={2.4} />
+													</button>
+												</div>
+											</div>
+
+											{notificationHistory.length === 0 ? (
+												<div className="notif-center-empty">
+													<div className="notif-center-empty-icon">
+														<Bell size={22} strokeWidth={1.8} />
+													</div>
+													<div className="notif-center-empty-title">No Notifications</div>
+													<div className="notif-center-empty-subtitle">You're all caught up!</div>
+												</div>
+											) : (
+												<div
+													className="notif-center-list"
+													onWheel={(e) => {
+														e.stopPropagation();
+														e.currentTarget.scrollTop += e.deltaY;
+													}}
+												>
+													<AnimatePresence mode="popLayout">
+														{notificationHistory.map((item) => (
+															<motion.div
+																key={item.id}
+																className="notif-card"
+																layout
+																initial={{ opacity: 0, y: -4 }}
+																animate={{ opacity: 1, y: 0 }}
+																exit={{ opacity: 0, scale: 0.95 }}
+																transition={{ duration: 0.15 }}
+																onClick={() => {
+																	invoke("focus_notification_app", {
+																		appName: item.app_name,
+																		appId: item.app_id
+																	}).catch(() => {});
+																	setIsOpen(false);
+																	setBloomMode(collapsedMode);
+																}}
+															>
+																<div className="notif-card-badge">
+																	<AppBrandIcon appName={item.app_name} appId={item.app_id} />
+																</div>
+																<div className="notif-card-content">
+																	<div className="notif-card-top">
+																		<span className="notif-card-app">{item.app_name}</span>
+																		<span className="notif-card-dot">•</span>
+																		<span className="notif-card-time">
+																			{formatRelativeTime(item.timestamp)}
+																		</span>
+																	</div>
+																	<div className="notif-card-title">{item.title}</div>
+																	{item.body ? <div className="notif-card-body">{item.body}</div> : null}
+																</div>
+																<button
+																	type="button"
+																	className="notif-card-delete-btn"
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		deleteNotification(item.id);
+																	}}
+																	title="Remove notification"
+																>
+																	<X size={11} strokeWidth={2.4} />
+																</button>
+															</motion.div>
+														))}
 													</AnimatePresence>
 												</div>
 											)}
@@ -4542,6 +5350,16 @@ function App() {
 								opacity: { duration: 0.15 }
 							}}
 							onAnimationComplete={() => reportNotchRect.current()}
+							onPointerEnter={() => {
+								if (shelfHoverTimer.current) clearTimeout(shelfHoverTimer.current);
+								shelfHoverTimer.current = setTimeout(() => {
+									setIsHovered(true);
+									openNotch("shelf");
+								}, 150);
+							}}
+							onPointerLeave={() => {
+								if (shelfHoverTimer.current) clearTimeout(shelfHoverTimer.current);
+							}}
 							onClick={(e) => {
 								e.stopPropagation();
 								setIsHovered(true);
@@ -4550,6 +5368,47 @@ function App() {
 						>
 							<Inbox size={12} strokeWidth={2.4} />
 							<span>{shelfItems.length}</span>
+						</motion.button>
+					)}
+				</AnimatePresence>
+				{/* Clipboard history bubble on the right of the collapsed pill */}
+				<AnimatePresence onExitComplete={() => reportNotchRect.current()}>
+					{showClipboardBubble && (
+						<motion.button
+							key="clipboard-bubble"
+							ref={clipboardBubbleRef}
+							type="button"
+							className={`activity-bubble clipboard-bubble ${isHovered ? "expanded" : ""}`}
+							aria-label={`Open clipboard: ${clipboardItems.length} items`}
+							style={{ left: "50%" }}
+							initial={{ opacity: 0, scale: 0.4, x: -28, marginLeft: clipboardBubbleMarginLeft }}
+							animate={{ opacity: 1, scale: 1, x: 0, marginLeft: clipboardBubbleMarginLeft }}
+							exit={{ opacity: 0, scale: 0.4, x: -28 }}
+							transition={{
+								type: "spring",
+								stiffness: 400,
+								damping: 31,
+								opacity: { duration: 0.15 }
+							}}
+							onAnimationComplete={() => reportNotchRect.current()}
+							onPointerEnter={() => {
+								if (clipboardHoverTimer.current) clearTimeout(clipboardHoverTimer.current);
+								clipboardHoverTimer.current = setTimeout(() => {
+									setIsHovered(true);
+									openNotch("clipboard");
+								}, 150);
+							}}
+							onPointerLeave={() => {
+								if (clipboardHoverTimer.current) clearTimeout(clipboardHoverTimer.current);
+							}}
+							onClick={(e) => {
+								e.stopPropagation();
+								setIsHovered(true);
+								openNotch("clipboard");
+							}}
+						>
+							<Clipboard size={12} strokeWidth={2.4} />
+							<span>{clipboardItems.length}</span>
 						</motion.button>
 					)}
 				</AnimatePresence>
@@ -4564,8 +5423,8 @@ function App() {
 							aria-label={mediaInfo.title ? `Open music: ${mediaInfo.title}` : "Open music"}
 							// Anchored at the pill's centre, offset past its right edge.
 							style={{ left: "50%" }}
-							initial={{ opacity: 0, scale: 0.4, x: -28, marginLeft: getDynamicWidth() / 2 + 8 }}
-							animate={{ opacity: 1, scale: 1, x: 0, marginLeft: getDynamicWidth() / 2 + 8 }}
+							initial={{ opacity: 0, scale: 0.4, x: -28, marginLeft: musicBubbleMarginLeft }}
+							animate={{ opacity: 1, scale: 1, x: 0, marginLeft: musicBubbleMarginLeft }}
 							exit={{ opacity: 0, scale: 0.4, x: -28 }}
 							transition={{
 								type: "spring",
@@ -4585,6 +5444,59 @@ function App() {
 							) : (
 								<Music size={14} strokeWidth={2.2} />
 							)}
+						</motion.button>
+					)}
+				</AnimatePresence>
+				{/* Unread notification activity bubble on the right of the collapsed pill */}
+				<AnimatePresence onExitComplete={() => reportNotchRect.current()}>
+					{showNotificationBubble && (
+						<motion.button
+							key="notification-bubble"
+							ref={notificationBubbleRef}
+							type="button"
+							className={`activity-bubble notification-bubble ${isHovered ? "expanded" : ""}`}
+							aria-label={`Unread notifications: ${unreadNotificationCount}`}
+							style={{ left: "50%" }}
+							initial={{
+								opacity: 0,
+								scale: 0.4,
+								x: -28,
+								marginLeft: notificationBubbleMarginLeft
+							}}
+							animate={{
+								opacity: 1,
+								scale: 1,
+								x: 0,
+								marginLeft: notificationBubbleMarginLeft
+							}}
+							exit={{ opacity: 0, scale: 0.4, x: -28 }}
+							transition={{
+								type: "spring",
+								stiffness: 400,
+								damping: 31,
+								opacity: { duration: 0.15 }
+							}}
+							onAnimationComplete={() => reportNotchRect.current()}
+							onPointerEnter={() => {
+								if (notificationHoverTimer.current) clearTimeout(notificationHoverTimer.current);
+								notificationHoverTimer.current = setTimeout(() => {
+									setIsHovered(true);
+									openNotch("notifications");
+								}, 150);
+							}}
+							onPointerLeave={() => {
+								if (notificationHoverTimer.current) clearTimeout(notificationHoverTimer.current);
+							}}
+							onClick={(e) => {
+								e.stopPropagation();
+								if (notificationHoverTimer.current) clearTimeout(notificationHoverTimer.current);
+								setIsHovered(true);
+								setUnreadNotificationCount(0);
+								openNotch("notifications");
+							}}
+						>
+							<BellRing size={12} strokeWidth={2.4} />
+							<span>{unreadNotificationCount > 0 ? unreadNotificationCount : notificationHistory.length}</span>
 						</motion.button>
 					)}
 				</AnimatePresence>

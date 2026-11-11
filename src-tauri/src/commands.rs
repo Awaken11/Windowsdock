@@ -81,6 +81,46 @@ pub fn setup_shelf_drop(app: AppHandle) {
     });
 }
 
+#[tauri::command]
+pub fn setup_dock_drop(app: AppHandle) {
+    let first = app.clone();
+    let _ = app.run_on_main_thread(move || crate::dock_drop::setup(&first));
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
+        let late = app.clone();
+        let _ = app.run_on_main_thread(move || crate::dock_drop::setup(&late));
+    });
+}
+
+#[tauri::command]
+pub async fn spring_load_focus(hwnd: Option<isize>, hwnds: Option<Vec<isize>>) {
+    tauri::async_runtime::spawn_blocking(move || unsafe {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            BringWindowToTop, IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow,
+            SW_RESTORE, SW_SHOW,
+        };
+        let target = hwnds
+            .as_ref()
+            .and_then(|list| list.first().copied())
+            .or(hwnd);
+        let Some(target_hwnd) = target else {
+            return;
+        };
+        let hwnd = HWND(target_hwnd as *mut _);
+        if !IsWindowVisible(hwnd).as_bool() {
+            let _ = ShowWindow(hwnd, SW_SHOW);
+        }
+        if IsIconic(hwnd).as_bool() {
+            bring_restore_position_on_screen(hwnd);
+            let _ = ShowWindow(hwnd, SW_RESTORE);
+        }
+        let _ = BringWindowToTop(hwnd);
+        let _ = SetForegroundWindow(hwnd);
+    })
+    .await
+    .unwrap_or_default();
+}
+
 /// Preview for a shelf item: a picture, the opening text, or neither (the
 /// frontend then shows an icon for the file type). See shelf_preview.rs.
 #[tauri::command]
@@ -650,6 +690,11 @@ pub fn is_start_menu_open() -> bool {
         }
         false
     }
+}
+
+#[tauri::command]
+pub fn is_search_open() -> bool {
+    is_start_menu_open()
 }
 
 /// Open Start through Explorer, independently of the foreground app's integrity
@@ -1685,6 +1730,11 @@ pub async fn get_app_icon(
     name: Option<String>,
     hwnd: Option<isize>,
 ) -> Result<Option<String>, String> {
+    let path = if path == "bloom-settings" {
+        "windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel".to_string()
+    } else {
+        path
+    };
     let cache_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     let cache_path = cache_dir.join("icons_cache.json");
     let cache_key = get_cache_key(&path, name.as_deref());
@@ -1980,8 +2030,20 @@ pub async fn load_pinned_apps(app: AppHandle) -> Vec<AppInfo> {
         .app_config_dir()
         .unwrap_or_default()
         .join("pinned_apps.json");
-    if let Ok(content) = std::fs::read_to_string(path) {
-        if let Ok(apps) = serde_json::from_str::<Vec<AppInfo>>(&content) {
+    if let Ok(content) = std::fs::read_to_string(&path) {
+        if let Ok(mut apps) = serde_json::from_str::<Vec<AppInfo>>(&content) {
+            let mut modified = false;
+            for a in &mut apps {
+                if a.path == "bloom-settings" {
+                    a.path = "windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel".into();
+                    a.executable = Some("SystemSettings.exe".into());
+                    a.name = "Settings".into();
+                    modified = true;
+                }
+            }
+            if modified {
+                let _ = std::fs::write(&path, serde_json::to_string(&apps).unwrap_or_default());
+            }
             return tauri::async_runtime::spawn_blocking(move || refresh_pinned_names(apps))
                 .await
                 .unwrap_or_default();
@@ -2017,11 +2079,11 @@ pub async fn load_pinned_apps(app: AppHandle) -> Vec<AppInfo> {
         },
         AppInfo {
             name: "Settings".into(),
-            path: "bloom-settings".into(),
+            path: "windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel".into(),
             icon: None,
             is_running: false,
             hwnd: None,
-            executable: None,
+            executable: Some("SystemSettings.exe".into()),
             all_hwnds: None,
         },
     ]
@@ -3865,7 +3927,7 @@ fn apply_imported_settings(app: &AppHandle, settings: &str) -> Result<(), String
         );
     }
 
-    if imported.get("bloom-scale").is_some() {
+    if imported.contains_key("bloom-scale") {
         re_register_appbars(app, &imported);
     }
 
@@ -4185,6 +4247,18 @@ mod pwa_icon_tests {
     }
 
     #[test]
+    fn windows_settings_icon_test() {
+        let _ = unsafe {
+            windows::Win32::System::Com::CoInitializeEx(
+                None,
+                windows::Win32::System::Com::COINIT_MULTITHREADED,
+            )
+        };
+        let icon = icon_from_aumid("windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel");
+        assert!(icon.is_some(), "Windows Settings icon should be successfully extracted");
+    }
+
+    #[test]
     fn aumid_detection() {
         assert!(is_aumid_path("4DF9E0F8.Netflix_mcm4njqhnhss8!Netflix.App"));
         assert!(is_aumid_path("Microsoft.VisualStudioCode"));
@@ -4397,10 +4471,63 @@ pub enum SystemAction {
     PowerOptions,
     NetworkConnections,
     TaskView,
+    Search,
 }
 
 #[tauri::command]
 pub async fn open_system_action(action: SystemAction) -> Result<(), String> {
+    if matches!(action, SystemAction::Search) {
+        return tauri::async_runtime::spawn_blocking(move || unsafe {
+            use windows::Win32::UI::Input::KeyboardAndMouse::{
+                SendInput, INPUT, INPUT_0, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_LWIN,
+            };
+            let s_key = VIRTUAL_KEY(0x53);
+            let inputs = [
+                INPUT {
+                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
+                    Anonymous: INPUT_0 {
+                        ki: KEYBDINPUT {
+                            wVk: VK_LWIN,
+                            ..Default::default()
+                        },
+                    },
+                },
+                INPUT {
+                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
+                    Anonymous: INPUT_0 {
+                        ki: KEYBDINPUT {
+                            wVk: s_key,
+                            ..Default::default()
+                        },
+                    },
+                },
+                INPUT {
+                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
+                    Anonymous: INPUT_0 {
+                        ki: KEYBDINPUT {
+                            wVk: s_key,
+                            dwFlags: KEYEVENTF_KEYUP,
+                            ..Default::default()
+                        },
+                    },
+                },
+                INPUT {
+                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
+                    Anonymous: INPUT_0 {
+                        ki: KEYBDINPUT {
+                            wVk: VK_LWIN,
+                            dwFlags: KEYEVENTF_KEYUP,
+                            ..Default::default()
+                        },
+                    },
+                },
+            ];
+            SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+            Ok(())
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    }
     tauri::async_runtime::spawn_blocking(move || unsafe {
         use windows::Win32::UI::Shell::ShellExecuteW;
         use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
@@ -4437,6 +4564,7 @@ pub async fn open_system_action(action: SystemAction) -> Result<(), String> {
                 "explorer.exe".into(),
                 "shell:::{3080F90E-D7AD-11D9-BD98-0000947B0257}".into(),
             ),
+            SystemAction::Search => unreachable!(),
         };
         let file: Vec<u16> = file.encode_utf16().chain(Some(0)).collect();
         let args: Vec<u16> = args.encode_utf16().chain(Some(0)).collect();

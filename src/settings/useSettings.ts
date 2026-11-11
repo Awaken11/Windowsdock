@@ -61,7 +61,7 @@ export function useSettings() {
 	);
 	const [musicCompactNotch, setMusicCompactNotch] = useState(true);
 	const [shelfPersist, setShelfPersist] = useState(
-		() => localStorage.getItem("bloom-shelf-persist") === "true"
+		() => localStorage.getItem("bloom-shelf-persist") !== "false"
 	);
 	const [volumeOverlayEnabled, setVolumeOverlayEnabled] = useState(true);
 	const [volumeEdgeEnabled, setVolumeEdgeEnabled] = useState(
@@ -128,6 +128,9 @@ export function useSettings() {
 	);
 	const [dockExtrasRecycleBin, setDockExtrasRecycleBin] = useState(
 		() => localStorage.getItem("bloom-dock-extras-recycle-bin") !== "false"
+	);
+	const [dockSearchEnabled, setDockSearchEnabled] = useState(
+		() => localStorage.getItem("bloom-dock-search-enabled") !== "false"
 	);
 	// Off unless turned on, so existing docks don't change.
 	const [dockTaskView, setDockTaskView] = useState(
@@ -221,7 +224,7 @@ export function useSettings() {
 				setNotchRememberPanel, readBool);
 			apply(getVal("bloom-notch-default-panel"), setNotchDefaultPanel, asPanelChoice);
 			apply(getVal("bloom-music-compact-notch"), setMusicCompactNotch, readBool);
-			apply(getVal("bloom-shelf-persist"), setShelfPersist, readBool);
+			apply(getVal("bloom-shelf-persist"), setShelfPersist, (v) => v !== "false");
 			apply(getVal("bloom-volume-overlay-enabled"), setVolumeOverlayEnabled, readBool);
 			apply(getVal("bloom-brightness-overlay-enabled"), setBrightnessOverlayEnabled, readBool);
 			apply(getVal("bloom-media-ambience-enabled"), setMediaAmbienceEnabled, readBool);
@@ -243,6 +246,7 @@ export function useSettings() {
 			apply(getVal("bloom-dock-extras-position"), setDockExtrasPosition, (v) => v);
 			apply(getVal("bloom-dock-extras-drives"), setDockExtrasDrives, readBool);
 			apply(getVal("bloom-dock-extras-recycle-bin"), setDockExtrasRecycleBin, readBool);
+			apply(getVal("bloom-dock-search-enabled"), setDockSearchEnabled, (v) => v !== "false");
 			apply(getVal("bloom-dock-task-view"), setDockTaskView, readBool);
 			apply(getVal("bloom-dock-extras-hidden-drives"), setDockExtrasHiddenDrives, (v) => v);
 			apply(getVal("bloom-dock-extras-folders"), setDockExtrasFolders, (v) => v);
@@ -387,6 +391,7 @@ export function useSettings() {
 		"bloom-dock-extras-position": setDockExtrasPosition,
 		"bloom-dock-extras-drives": setDockExtrasDrives,
 		"bloom-dock-extras-recycle-bin": setDockExtrasRecycleBin,
+		"bloom-dock-search-enabled": setDockSearchEnabled,
 		"bloom-dock-task-view": setDockTaskView,
 		"bloom-dock-extras-hidden-drives": setDockExtrasHiddenDrives,
 		"bloom-dock-extras-folders": setDockExtrasFolders,
@@ -753,6 +758,12 @@ export function useSettings() {
 		saveSetting("bloom-dock-extras-recycle-bin", String(next));
 	};
 
+	const toggleDockSearch = () => {
+		const next = !dockSearchEnabled;
+		setDockSearchEnabled(next);
+		saveSetting("bloom-dock-search-enabled", String(next));
+	};
+
 	const toggleDockTaskView = () => {
 		const next = !dockTaskView;
 		setDockTaskView(next);
@@ -1092,6 +1103,8 @@ export function useSettings() {
 		toggleDockExtrasDrive,
 		dockExtrasRecycleBin,
 		toggleDockExtrasRecycleBin,
+		dockSearchEnabled,
+		toggleDockSearch,
 		dockTaskView,
 		toggleDockTaskView,
 		dockExtrasFolders,

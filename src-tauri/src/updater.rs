@@ -252,8 +252,8 @@ async fn install_inner(app: &AppHandle) -> Result<(), String> {
                 let current =
                     downloaded_cb.fetch_add(chunk_len as u64, Ordering::Relaxed) + chunk_len as u64;
                 if let Some(total) = total {
-                    if total > 0 {
-                        let progress = (current.saturating_mul(100) / total) as u32;
+                    if let Some(div) = current.saturating_mul(100).checked_div(total) {
+                        let progress = div as u32;
                         let _ = progress_handle.emit(
                             "auto-update-status",
                             serde_json::json!({ "status": "downloading", "progress": progress }),
