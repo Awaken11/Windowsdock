@@ -1,12 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
-    <!-- Background Gradient -->
-    <radialGradient id="bgGlow" cx="50%" cy="50%" r="60%">
-      <stop offset="0%" stop-color="#181336"/>
-      <stop offset="60%" stop-color="#090718"/>
-      <stop offset="100%" stop-color="#05040d"/>
-    </radialGradient>
-
     <!-- A Shape Linear Gradient: Purple to Electric Cyan -->
     <linearGradient id="aGradient" x1="15%" y1="90%" x2="85%" y2="90%">
       <stop offset="0%" stop-color="#6d28d9"/>
@@ -43,17 +36,11 @@
     </filter>
   </defs>
 
-  <!-- Squircle Base Frame -->
-  <rect width="512" height="512" rx="116" fill="url(#bgGlow)"/>
-
-  <!-- Subtle Ambient Core Lighting -->
-  <circle cx="256" cy="270" r="140" fill="#3b0764" opacity="0.4" filter="blur(30px)"/>
-
   <!-- Back Portion of the Orbit Ring -->
   <ellipse cx="256" cy="272" rx="200" ry="52" 
            fill="none" 
            stroke="url(#orbitGrad)" 
-           stroke-width="4.5"
+           stroke-width="5"
            stroke-dasharray="380 400"
            stroke-dashoffset="190"
            transform="rotate(-23 256 272)"
@@ -61,8 +48,6 @@
            filter="url(#luminousGlow)" />
 
   <!-- The Stylized Uppercase A -->
-  <!-- Outer Triangle: apex (256, 100), bottom-left (92, 412), bottom-right (420, 412) -->
-  <!-- Inner Triangle: apex (256, 186), bottom-left (152, 348), bottom-right (360, 348) -->
   <path d="M 256 100 
            L 420 412 
            L 348 412 
@@ -76,14 +61,13 @@
   <ellipse cx="256" cy="272" rx="200" ry="52" 
            fill="none" 
            stroke="url(#orbitGrad)" 
-           stroke-width="5"
+           stroke-width="5.5"
            stroke-dasharray="320 460"
            stroke-dashoffset="0"
            transform="rotate(-23 256 272)"
            filter="url(#luminousGlow)" />
 
   <!-- Celestial Planet Node at ~top-right of Orbit -->
-  <!-- Transformed position along the ellipse -->
   <circle cx="395" cy="174" r="11" fill="#00f2fe" filter="url(#planetGlow)"/>
   <circle cx="395" cy="174" r="6" fill="#e0f2fe"/>
 </svg>

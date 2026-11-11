@@ -67,14 +67,15 @@
 	inset: 0;
 	border-radius: inherit;
 	background: var(--surface-solid);
-	box-shadow: 0 0 0 1px var(--surface-solid);
-	/* The border box including its corner radii. */
-	clip-path: border-box;
 }
 
 .edge-surface--top::before {
 	left: 13px;
 	right: 13px;
+	border-bottom-left-radius: 18px !important;
+	border-bottom-right-radius: 18px !important;
+	border-top-left-radius: 0 !important;
+	border-top-right-radius: 0 !important;
 }
 
 .edge-surface--bottom::before {
@@ -82,16 +83,23 @@
 	bottom: 0;
 	left: 13px;
 	right: 13px;
-}
-
-.edge-surface--bottom::before {
 	border-top-left-radius: 18px !important;
 	border-top-right-radius: 18px !important;
+	border-bottom-left-radius: 0 !important;
+	border-bottom-right-radius: 0 !important;
 }
 
-.edge-surface--top::before {
-	border-bottom-left-radius: 18px !important;
-	border-bottom-right-radius: 18px !important;
+/* For horizontal surfaces (dock and notch), the native SVG path draws the entire
+   silhouette (pill, corners, wave, and flares) as one continuous vector shape.
+   Suppress ::before and CSS flare spans so zero box corners can ever poke out. */
+.edge-surface--top::before,
+.edge-surface--bottom::before {
+	display: none !important;
+}
+
+.edge-surface--top .edge-surface-flare,
+.edge-surface--bottom .edge-surface-flare {
+	display: none !important;
 }
 
 /* A single SVG stroke follows the entire silhouette, including the flares.

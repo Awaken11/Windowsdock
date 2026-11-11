@@ -49,7 +49,8 @@ export function EdgeSurface({ edge, flares = true, reflective = false, wave }: E
 	useLayoutEffect(() => {
 		const surface = surfaceRef.current;
 		const parent = surface?.parentElement;
-		if (!reflective || !surface || !parent || (edge !== "top" && edge !== "bottom")) return;
+		const isHorizontal = edge === "top" || edge === "bottom";
+		if (!surface || !parent || !isHorizontal) return;
 
 		// Read the animated CSS radii and untransformed dimensions together.
 		// Update only the SVG path: React need not render on each spring frame.
@@ -78,7 +79,6 @@ export function EdgeSurface({ edge, flares = true, reflective = false, wave }: E
 			const xEnd = right - rr;
 			const H = wave && typeof wave.height === "number" ? wave.height : 0;
 			const crestX = wave && typeof wave.crestX === "number" ? wave.crestX : null;
-			let humpPath = "";
 
 			const waveKey = bottom && H > 0.05 && crestX !== null
 				? `${crestX.toFixed(1)},${H.toFixed(1)}`
@@ -206,21 +206,6 @@ export function EdgeSurface({ edge, flares = true, reflective = false, wave }: E
 						rightCorner = ` L ${right} ${yEnd.toFixed(1)}`;
 					}
 					path += rightCorner;
-
-					// 7. Hump fill (covers area above topOffset seamlessly)
-					if (hStart > 0.05 && rl > 0) {
-						humpPath = `M ${left} ${topOffset + 3} L ${left} ${topOffset + rl}${leftCorner}`;
-					} else {
-						humpPath = `M ${x0.toFixed(1)} ${topOffset + 3} L ${x0.toFixed(1)} ${topOffset}`;
-					}
-					humpPath += waveArch;
-					if (hEnd > 0.05 && rr > 0) {
-						humpPath += rightCorner;
-						humpPath += ` L ${right} ${topOffset + 3}`;
-					} else {
-						humpPath += ` L ${x1.toFixed(1)} ${topOffset + 3}`;
-					}
-					humpPath += " Z";
 				}
 				if (flares) {
 					path += ` L ${right} ${height - 13} C ${right} ${height - 3} ${width - 10} ${height} ${width} ${height}`;
@@ -241,7 +226,7 @@ export function EdgeSurface({ edge, flares = true, reflective = false, wave }: E
 				ref.current?.setAttribute("d", path);
 			}
 			if (fillRef.current) {
-				fillRef.current.setAttribute("d", humpPath);
+				fillRef.current.setAttribute("d", `${path} Z`);
 			}
 
 			// Fade only the concave tips, in a fixed 13px span at either end.
@@ -261,11 +246,13 @@ export function EdgeSurface({ edge, flares = true, reflective = false, wave }: E
 		};
 	}, [edge, flares, reflective, wave?.crestX, wave?.height]);
 
+	const isHorizontal = edge === "top" || edge === "bottom";
+
 	return (
 		<div ref={surfaceRef} className={`edge-surface edge-surface--${edge}${flares ? " show-flares" : ""}`} aria-hidden="true">
-			<span className="edge-surface-flare edge-surface-flare--start" />
-			<span className="edge-surface-flare edge-surface-flare--end" />
-			{reflective && (
+			{!isHorizontal && <span className="edge-surface-flare edge-surface-flare--start" />}
+			{!isHorizontal && <span className="edge-surface-flare edge-surface-flare--end" />}
+			{isHorizontal && (
 				<svg className="edge-surface-rim" width="100%" height="100%">
 					<defs>
 						<clipPath id={clipId}>
@@ -286,18 +273,20 @@ export function EdgeSurface({ edge, flares = true, reflective = false, wave }: E
 							<rect width="100%" height="100%" fill={`url(#${fadeId})`} />
 						</mask>
 					</defs>
-					{/* Fill the wave hump seamlessly with the same solid surface token */}
+					{/* Complete continuous silhouette vector fill */}
 					<path ref={fillRef} fill="var(--surface-solid)" />
-					<g ref={rimGroupRef}>
-						{/* A faint inner shoulder makes the rim read as reflected
-						    light on a bevel rather than an isolated bright wire. */}
-						<path ref={bevelRef} fill="none" stroke={`url(#${gradientId})`} strokeWidth="4" opacity="0.16"
-							clipPath={`url(#${clipId})`} mask={flares ? `url(#${maskId})` : undefined} />
-						{/* Clip a 2px centred stroke to leave a full 1px INSIDE
-						    the fill, including at the viewport's horizontal edges. */}
-						<path ref={rimRef} fill="none" stroke={`url(#${gradientId})`} strokeWidth="2"
-							clipPath={`url(#${clipId})`} mask={flares ? `url(#${maskId})` : undefined} />
-					</g>
+					{reflective && (
+						<g ref={rimGroupRef}>
+							{/* A faint inner shoulder makes the rim read as reflected
+							    light on a bevel rather than an isolated bright wire. */}
+							<path ref={bevelRef} fill="none" stroke={`url(#${gradientId})`} strokeWidth="4" opacity="0.16"
+								clipPath={`url(#${clipId})`} mask={flares ? `url(#${maskId})` : undefined} />
+							{/* Clip a 2px centred stroke to leave a full 1px INSIDE
+							    the fill, including at the viewport's horizontal edges. */}
+							<path ref={rimRef} fill="none" stroke={`url(#${gradientId})`} strokeWidth="2"
+								clipPath={`url(#${clipId})`} mask={flares ? `url(#${maskId})` : undefined} />
+						</g>
+					)}
 				</svg>
 			)}
 		</div>
