@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest an idea or improvement for Bloom. Please discuss it here before opening a PR.
+description: Suggest an idea or improvement for Awaken. Please discuss it here before opening a PR.
 title: "[Feature]: "
 labels:
   - enhancement
@@ -20,7 +20,7 @@ body:
   - type: dropdown
     id: area
     attributes:
-      label: Which part of Bloom does this relate to?
+      label: Which part of Awaken does this relate to?
       options:
         - Dock
         - Notch

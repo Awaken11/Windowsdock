@@ -1,6 +1,6 @@
 # Dock background apps and system actions
 
-An unpinned app remains in the dock after its last window closes only if Bloom
+An unpinned app remains in the dock after its last window closes only if Awaken
 observed that app with a window during the current session and it still has a
 live notification icon. Other tray-only apps do not fill the dock. Pinned apps
 show a grey dot from startup when they are already active in the tray. Windowed
@@ -10,7 +10,7 @@ App Separator controls the thin theme-aware divider; it is on by default and
 appears only when an unpinned app is present.
 
 - Click a background app to invoke its notification icon's default action.
-- Right-click a background app for Bloom's menu. Its "App tray menu" entry
+- Right-click a background app for Awaken's menu. Its "App tray menu" entry
   opens the app's native tray context menu.
 - An app with several tray icons has a separate menu entry for each icon.
 - Start's context menu includes Task Manager, Disk Management, Device Manager,
@@ -26,8 +26,8 @@ count as running. Explorer-hosted system icons (including Bluetooth) are exclude
 because their process path is shared with File Explorer windows. The frontend reconciles tray owners with actual window handles,
 including applications launched through shell IDs. A shared browser tray does
 not combine multiple PWAs. Pinned shell IDs also match visible app windows when
-their executable paths differ, so opening Bloom's Settings window does not add
-an unpinned duplicate of a pinned Bloom app.
+their executable paths differ, so opening Awaken's Settings window does not add
+an unpinned duplicate of a pinned Awaken app.
 
 Native interactions use UI Automation. Windows reports the chevron rectangle for
 an icon hidden in the overflow, so hidden icons are matched by the live
@@ -69,7 +69,7 @@ cargo test --locked live_tray_discovery -- --ignored --nocapture
 
 Manual acceptance checks (required before merging):
 
-1. On Bloom startup, unrelated tray-only apps stay out of the dock; pinned apps
+1. On Awaken startup, unrelated tray-only apps stay out of the dock; pinned apps
    already active in the tray show a grey dot.
 2. Start an unpinned Discord with one window: one normal dot, no duplicate entry.
 3. Close Discord to the tray: one grey dot, no window thumbnail.
@@ -80,13 +80,13 @@ Manual acceptance checks (required before merging):
 7. Repeat with an icon in overflow, a promoted icon, and an app with multiple icons.
    Include apps whose tooltips differ from their executable names, such as
    Tailscale, Phone Link, and Windows Security.
-8. Exit/restart Explorer, exit Bloom during menu opening, and toggle the dock off:
+8. Exit/restart Explorer, exit Awaken during menu opening, and toggle the dock off:
    the taskbar must return to the intended state with no transparent residue.
 9. Check Start and dock system actions, including denied UAC and launch errors.
-10. Check light/dark themes, large Bloom scale, multiple monitors and mixed DPI.
+10. Check light/dark themes, large Awaken scale, multiple monitors and mixed DPI.
 11. Toggle App Separator off and on: only the divider changes; unpinned apps stay
-    on the right. Open pinned Bloom and check that Settings appears without a
-    second unpinned Bloom icon. File Explorer must not show Bluetooth tray actions.
+    on the right. Open pinned Awaken and check that Settings appears without a
+    second unpinned Awaken icon. File Explorer must not show Bluetooth tray actions.
 
 Live discovery, the Discord background dot, and Discord's native context menu
 have been exercised on the development machine. The broader compatibility,

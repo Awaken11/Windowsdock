@@ -36,7 +36,8 @@ Watch it transform.
 - **Clipboard History & Image Zoom** — Multi-format clipboard monitoring with two-column preview capsules and interactive high-resolution zoom.
 - **Command Center** — Wi-Fi, Bluetooth, volume, and display brightness.
 - **Calendar & Focus** — Month view with an integrated Pomodoro timer.
-- **Drop Shelf** — Park files, code snippets, and dragged items right on top of the notch.
+- **Drop Shelf & Scratchpad Notes** — Park files, dragged items, and write quick markdown notes directly in the notch with auto-collapse.
+- **Universal Downloads Hub** — Active transfer progress, speeds, and quick open actions right beside the notch.
 
 ---
 
@@ -50,6 +51,8 @@ Awaken replaces your native Windows taskbar with an intelligent, physics-driven 
 - Folder stacks (Downloads, Desktop, Custom) and drive shortcuts.
 - System tray popouts and Start menu integration.
 - Instant taskbar restoration fail-safe: crash watchdog ensures Windows Explorer taskbar is never lost.
+- **Customization Hub:** Backdrop materials (Glass, Frosted Acrylic, Mica Slate, Deep Solid) and icon themes (Native, macOS Squircle, Cyber Neon, Monochrome Minimal).
+- **Global Hotkey:** Instant dock visibility toggle anywhere on the desktop.
 
 ---
 
@@ -84,11 +87,18 @@ bun run tauri build --no-bundle
 ```
 The compiled executable will be located at `src-tauri/target/release/awaken.exe`.
 
+### Build Windows Setup Installer
+
+```bash
+bun run tauri build --bundles nsis
+```
+The standalone installer executable will be generated at:
+`src-tauri/target/release/bundle/nsis/Awaken_3.10.1_x64-setup.exe`
+
 ---
 
 ## Attribution & License
 
-Awaken is an independently maintained desktop shell for Windows, maintained by **Awaken11** (<Akhil.Aafriya0987@outlook.com>).
-Originally derived from the open-source project Bloom by Sehajveer Singh and contributors.
+Awaken is maintained by **Awaken11** (<Akhil.Aafriya0987@outlook.com>).
 
 Licensed under the **GNU General Public License v3.0 (GPLv3)**. See [`LICENSE`](LICENSE) for details.

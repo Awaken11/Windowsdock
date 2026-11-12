@@ -1,10 +1,10 @@
-# Bloom Settings Reference
+# Awaken Settings Reference
 
-All settings are stored in `settings.json` in the app config directory (`%APPDATA%/bloom/`). The file is a flat JSON object with `bloom-` prefixed keys. Bloom watches this file for external changes and applies them in real-time.
+All settings are stored in `settings.json` in the app config directory (`%APPDATA%/com.akhil.awaken/`). The file is a flat JSON object with `bloom-` prefixed keys. Awaken watches this file for external changes and applies them in real-time.
 
 ## Quick Start
 
-Edit `settings.json` with any text editor while Bloom is running. Changes are applied immediately — no restart required.
+Edit `settings.json` with any text editor while Awaken is running. Changes are applied immediately — no restart required.
 
 ```json
 {
@@ -21,7 +21,7 @@ Edit `settings.json` with any text editor while Bloom is running. Changes are ap
 
 | Key                                | Type                             | Default       | Description                                                                                                                                                                      |
 | ---------------------------------- | -------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bloom-dock-enabled`               | `"true"` / `"false"`             | `"true"`      | Show or hide the Bloom Dock (taskbar replacement).                                                                                                                               |
+| `bloom-dock-enabled`               | `"true"` / `"false"`             | `"true"`      | Show or hide the Awaken Dock (taskbar replacement).                                                                                                                               |
 | `bloom-dock-mode`                  | `"fixed"` / `"smart"` / `"peek"` | `"smart"`     | Dock visibility behavior. **fixed** = always visible as AppBar. **smart** = floating overlay over windows without taking screen space; auto-hides for true fullscreen apps. **peek** = hidden until cursor approaches bottom edge. |
 | `bloom-dock-edge-delay`            | milliseconds `"0"`–`"2000"`      | `"200"`       | In smart/peek mode, how long the cursor must rest against the bottom screen edge before the dock appears. `"0"` reveals instantly.                                               |
 | `bloom-dock-preview-enabled`       | `"true"` / `"false"`             | `"true"`      | Show window thumbnail previews when hovering dock icons.                                                                                                                         |
@@ -150,21 +150,21 @@ Example:
 
 ## Event System
 
-Bloom uses two Tauri events for settings synchronization:
+Awaken uses two Tauri events for settings synchronization:
 
 ### `settings-changed`
 
 - **Emitted by:** `save_setting` command (frontend or backend)
 - **Payload:** `{ "key": "bloom-...", "value": ... }`
-- **Purpose:** Broadcasts changes made through the Bloom UI to all windows
-- **Key format:** Bloom-prefixed keys as-is (e.g. `"bloom-dock-mode"`)
+- **Purpose:** Broadcasts changes made through the Awaken UI to all windows
+- **Key format:** Flat keys as-is (e.g. `"bloom-dock-mode"`)
 
 ### `settings-external-changed`
 
 - **Emitted by:** File watcher (detects external edits to `settings.json`)
 - **Payload:** `{ "key": "bloom-...", "value": ... }` or `{ "key": "bloom-...", "value": null }` for removed keys
 - **Purpose:** Broadcasts changes made by external editors (VS Code, notepad, scripts)
-- **Key format:** Bloom-prefixed keys as-is
+- **Key format:** Flat keys as-is
 - **Behavior:** Also syncs values to `localStorage` for instant frontend reads
 
 ### Flow
@@ -189,15 +189,15 @@ UI re-renders with new values
 
 ```powershell
 # PowerShell: switch dock to smart mode
-$json = Get-Content "$env:APPDATA\bloom\settings.json" | ConvertFrom-Json
+$json = Get-Content "$env:APPDATA\com.akhil.awaken\settings.json" | ConvertFrom-Json
 $json.'bloom-dock-mode' = 'smart'
-$json | ConvertTo-Json | Set-Content "$env:APPDATA\bloom\settings.json"
+$json | ConvertTo-Json | Set-Content "$env:APPDATA\com.akhil.awaken\settings.json"
 ```
 
 ```python
 # Python: disable dock
 import json, os
-path = os.path.join(os.environ['APPDATA'], 'bloom', 'settings.json')
+path = os.path.join(os.environ['APPDATA'], 'com.akhil.awaken', 'settings.json')
 with open(path) as f: settings = json.load(f)
 settings['bloom-dock-enabled'] = 'false'
 with open(path, 'w') as f: json.dump(settings, f)
@@ -209,5 +209,5 @@ with open(path, 'w') as f: json.dump(settings, f)
 - The `useSettingsSync` hook auto-converts `"true"` / `"false"` strings to booleans.
 - `auto-hide` mode values in `bloom-dock-mode` and `bloom-notch-mode` are legacy aliases for `smart` — they are mapped automatically.
 - Changing `bloom-scale` triggers AppBar re-registration to adjust reserved screen space.
-- Settings → General → Reset to Defaults removes every `bloom-` key from `settings.json` and `localStorage` (except the `bloom-first-run` / `bloom-app-version` lifecycle sentinels), then restarts Bloom. Pinned apps (`pinned_apps.json`) and uploaded icons (`custom_icons/`) are preserved.
+- Settings → General → Reset to Defaults removes every `bloom-` key from `settings.json` and `localStorage` (except the `bloom-first-run` / `bloom-app-version` lifecycle sentinels), then restarts Awaken. Pinned apps (`pinned_apps.json`) and uploaded icons (`custom_icons/`) are preserved.
 - Theme changes (`bloom-theme-*`) are applied by reading all theme values from `localStorage` and calling `applyTheme()` — the theme system depends on all five theme keys being in sync.

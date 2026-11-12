@@ -14,9 +14,12 @@ function startIconSource(icon: string) {
 		default: "/awaken.png",
 		awaken: "/awaken.png",
 		windows: "/windows-11.png",
-		"bloom-colorful": "/bloom-colorful.png",
-		"bloom-golden": "/bloom-golden.png",
-		"bloom-biscuit": "/bloom-biscuit.png"
+		"awaken-colorful": "/awaken-colorful.png",
+		"awaken-golden": "/awaken-golden.png",
+		"awaken-orange": "/awaken-orange.png",
+		"bloom-colorful": "/awaken-colorful.png",
+		"bloom-golden": "/awaken-golden.png",
+		"bloom-biscuit": "/awaken-orange.png"
 	};
 	return icon.startsWith("custom:") ? icon.slice(7) : (icons[icon] ?? "/awaken.png");
 }

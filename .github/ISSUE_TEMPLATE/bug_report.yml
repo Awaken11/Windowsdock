@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Bloom isn't working as expected
+description: Something in Awaken isn't working as expected
 title: "[Bug]: "
 labels:
   - bug
@@ -10,11 +10,11 @@ body:
         Search open and closed issues first. Please include the version you actually tested: a report against the latest release may still be valid even when a fix has only reached main. No approval is needed to report a bug.
 
   - type: input
-    id: bloom-version
+    id: awaken-version
     attributes:
-      label: Bloom version
-      description: "Settings → About (e.g. 3.8.6)"
-      placeholder: "3.8.6"
+      label: Awaken version
+      description: "Settings → About (e.g. 3.10.1)"
+      placeholder: "3.10.1"
     validations:
       required: true
 
@@ -30,7 +30,7 @@ body:
   - type: dropdown
     id: component
     attributes:
-      label: Which part of Bloom?
+      label: Which part of Awaken?
       options:
         - Dock
         - Notch
@@ -55,7 +55,7 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Open Bloom
+        1. Open Awaken
         2. Hover over the dock...
         3. See error
     validations:

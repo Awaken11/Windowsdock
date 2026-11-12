@@ -1,6 +1,6 @@
-# Contributing to Bloom
+# Contributing to Awaken
 
-Bloom is a lightweight Windows desktop companion: a dock, a notch, and a small set of system controls. Contributions should make those surfaces more reliable, useful, and consistent.
+Awaken is a lightweight Windows desktop companion: a dock, a dynamic notch, and a set of system controls and productivity tools. Contributions should make those surfaces more reliable, useful, and consistent.
 
 ## Pick the shortest path
 
@@ -23,7 +23,7 @@ Please discuss one substantial proposal at a time and wait for feedback before o
 
 Use the bug or feature form and search both open and closed issues first.
 
-- Bugs: Bloom/Windows versions, expected versus actual behavior, and a short reproduction. Screenshots, logs, or a recording help when available; they are not a barrier to reporting.
+- Bugs: Awaken/Windows versions, expected versus actual behavior, and a short reproduction. Screenshots, logs, or a recording help when available; they are not a barrier to reporting.
 - Features: one user problem, a small proposed change, and how it fits the existing UI.
 - `needs-discussion`: scope or approach is not yet agreed. This is not a rejection.
 - `accepted`: a maintainer has agreed on the scope; it is not a delivery date or permission to expand the feature.
@@ -65,4 +65,4 @@ Feature PRs without agreed scope may be closed with a pointer back to the issue;
 
 ## License
 
-Bloom is GPL-3.0. Contributions are licensed under the same terms.
+Awaken is GPL-3.0. Contributions are licensed under the same terms.

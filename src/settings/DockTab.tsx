@@ -84,9 +84,9 @@ function DrivePicker({
 
 const START_ICON_PRESETS = [
 	{ key: "default", src: "/awaken.png", label: "Awaken" },
-	{ key: "bloom-colorful", src: "/bloom-colorful.png", label: "Colorful" },
-	{ key: "bloom-golden", src: "/bloom-golden.png", label: "Golden" },
-	{ key: "bloom-biscuit", src: "/bloom-biscuit.png", label: "Orange" },
+	{ key: "awaken-colorful", src: "/awaken-colorful.png", label: "Colorful" },
+	{ key: "awaken-golden", src: "/awaken-golden.png", label: "Golden" },
+	{ key: "awaken-orange", src: "/awaken-orange.png", label: "Orange" },
 	{ key: "windows", src: "/windows-11.png", label: "Windows" }
 ];
 

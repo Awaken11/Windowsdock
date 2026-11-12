@@ -85,7 +85,7 @@ export function AboutTab({
 						<span>Awaken11</span>
 					</button>
 					<span style={{ display: "block", marginTop: "4px", fontSize: "11px", opacity: 0.6 }}>
-						Originally based on Bloom by sehaz • GPL-3.0
+						Released under GNU GPL-3.0 License
 					</span>
 				</p>
 			</div>

@@ -166,9 +166,9 @@ function SettingsGearIcon() {
 }
 
 function resolveStartIcon(startIcon: string): string {
-	if (startIcon === "bloom-colorful") return "/bloom-colorful.png";
-	if (startIcon === "bloom-golden") return "/bloom-golden.png";
-	if (startIcon === "bloom-biscuit") return "/bloom-biscuit.png";
+	if (startIcon === "bloom-colorful" || startIcon === "awaken-colorful") return "/awaken-colorful.png";
+	if (startIcon === "bloom-golden" || startIcon === "awaken-golden") return "/awaken-golden.png";
+	if (startIcon === "bloom-biscuit" || startIcon === "awaken-orange") return "/awaken-orange.png";
 	if (startIcon === "windows") return "/windows-11.png";
 	if (startIcon.startsWith("custom:")) return startIcon.slice("custom:".length);
 	return "/awaken.png";

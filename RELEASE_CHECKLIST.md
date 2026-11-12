@@ -1,7 +1,6 @@
 # Release checklist
 
-Bloom ships auto-updates to every install, so a bad release reaches users
-silently. Run this checklist for every release, every time.
+Awaken ships updates and standalone installers for every release. Run this checklist for every release, every time.
 
 ## 1. Before tagging (on `main`)
 
@@ -34,12 +33,9 @@ silently. Run this checklist for every release, every time.
       version, click Settings → About → Check for Updates. It must find the new
       version. Auto-install waits ~24 h by design (`MIN_AUTO_INSTALL_AGE_SECS`),
       but the badge/label must appear immediately.
-- [ ] Fresh install: download `bloom_X.Y.Z_x64-setup.exe`, install, confirm it
+- [ ] Fresh install: download `Awaken_X.Y.Z_x64-setup.exe`, install, confirm it
       launches and About shows the new version.
 - [ ] Quit from the tray on the fresh install; confirm the taskbar returns.
-- [ ] If users must be told something (workarounds, known issues), publish
-      `website/public/announcements.json` and pin a GitHub issue with direct
-      installer links.
 
 ## 4. If something is broken
 
