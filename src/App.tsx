@@ -3594,7 +3594,7 @@ function App() {
 			return 280;
 		}
 		if (bloomMode === "notes") {
-			return 260;
+			return 270;
 		}
 		if (bloomMode === "clipboard") {
 			if (zoomedImageItem) return 340;
@@ -5008,9 +5008,11 @@ function App() {
 													)}
 													<button
 														type="button"
-														className={`notch-notes-btn primary ${noteCopied ? "copied" : ""}`}
-														title="Copy note to clipboard"
+														className={`notch-notes-btn primary ${noteCopied ? "copied" : ""} ${scratchpadNote.trim().length === 0 ? "disabled" : ""}`}
+														title={scratchpadNote.trim().length === 0 ? "Note is empty" : "Copy note to clipboard"}
+														disabled={scratchpadNote.trim().length === 0}
 														onClick={async () => {
+															if (!scratchpadNote.trim()) return;
 															try {
 																await writeText(scratchpadNote);
 															} catch {
