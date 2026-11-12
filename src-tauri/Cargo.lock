@@ -340,7 +340,7 @@ dependencies = [
 
 [[package]]
 name = "awaken"
-version = "3.10.1"
+version = "1.0.0"
 dependencies = [
  "base64 0.22.1",
  "image",

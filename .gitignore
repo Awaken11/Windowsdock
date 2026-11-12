@@ -40,3 +40,4 @@ skills-lock.json
 # Internal Context
 context.md
 scratch/
+*.exe

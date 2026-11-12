@@ -29,7 +29,7 @@ function updateCargoLock() {
 	writeFileSync(
 		path,
 		content.replace(
-			/(\[\[package\]\]\r?\nname = "bloom"\r?\nversion = ")[^"]*(")/,
+			/(\[\[package\]\]\r?\nname = "(?:bloom|awaken)"\r?\nversion = ")[^"]*(")/,
 			`$1${version}$2`
 		)
 	);
