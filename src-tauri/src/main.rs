@@ -144,6 +144,9 @@ fn main() {
             sync_appbar,
             open_app,
             launch_new_instance,
+            run_as_admin,
+            open_file_location,
+            get_app_recent_files,
             update_dock_rect,
             update_notch_rect,
             window_region::set_window_region,
@@ -240,7 +243,9 @@ fn main() {
             notifications::dismiss_notification,
             notifications::focus_notification_app,
             downloads::get_download_summary,
-            downloads::open_download_file
+            downloads::open_download_file,
+            downloads::show_download_in_folder,
+            downloads::open_downloads_folder
         ])
         .setup(|app| {
             clipboard::start_clipboard_monitor(app.handle().clone());

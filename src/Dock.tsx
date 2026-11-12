@@ -20,8 +20,6 @@ import {
 import { driveLetter, hideDrive, removeCustomFolder, type DockExtra } from "./dockExtras";
 import { FolderStackPopover } from "./components/FolderStackPopover";
 import { createRegionSender, measureElements, padRect, type RegionRect } from "./windowRegion";
-import { ArrowDown } from "lucide-react";
-import { DownloadHubPopover, type DownloadProgressSummary, formatSpeed } from "./components/DownloadHubPopover";
 
 // Host processes (Edge/Chrome/Brave/ApplicationFrameHost) run every PWA/UWP
 // window, so their window title must be part of their identity — otherwise two
@@ -233,9 +231,8 @@ const Dock = memo(function Dock() {
 		() => localStorage.getItem("bloom-dock-adaptive") === "true"
 	);
 	const [dockSearchEnabled, setDockSearchEnabled] = useState(
-		() => localStorage.getItem("bloom-dock-search-enabled") !== "false"
+		() => localStorage.getItem("bloom-dock-search-enabled") === "true"
 	);
-	const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 	const [hotkeyRevealed, setHotkeyRevealed] = useState(false);
 	const [dockTaskView, setDockTaskView] = useState(
 		() => localStorage.getItem("bloom-dock-task-view") === "true"
@@ -269,6 +266,20 @@ const Dock = memo(function Dock() {
 		taskView?: boolean;
 		searchButton?: boolean;
 	} | null>(null);
+	const [appRecentFiles, setAppRecentFiles] = useState<{ name: string; path: string }[]>([]);
+
+	useEffect(() => {
+		if (contextMenu?.app && contextMenu.app.path !== "start") {
+			invoke<{ name: string; path: string }[]>("get_app_recent_files", {
+				appName: contextMenu.app.name,
+				appPath: contextMenu.app.path
+			})
+				.then((files) => setAppRecentFiles(files || []))
+				.catch(() => setAppRecentFiles([]));
+		} else {
+			setAppRecentFiles([]);
+		}
+	}, [contextMenu?.app]);
 	const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
 	const [activeOrder, setActiveOrder] = useState<string[]>([]);
 	const observedTrayPathsRef = useRef(new Set<string>());
@@ -291,14 +302,6 @@ const Dock = memo(function Dock() {
 	const [dockIconTheme, setDockIconTheme] = useState(
 		() => localStorage.getItem("bloom-dock-icon-theme") || "native"
 	);
-	const [dockDownloadsEnabled, setDockDownloadsEnabled] = useState(
-		() => localStorage.getItem("bloom-dock-downloads-enabled") !== "false"
-	);
-	const [downloadSummary, setDownloadSummary] = useState<DownloadProgressSummary | null>(null);
-	const [showDownloadHub, setShowDownloadHub] = useState(false);
-	const downloadHubAnchorRef = useRef<HTMLDivElement | null>(null);
-	const downloadHubPopoverRef = useRef<HTMLDivElement | null>(null);
-	const [downloadHubAnchorX, setDownloadHubAnchorX] = useState(0);
 	const [, setRegionTick] = useState(0);
 	const [springAppId, setSpringAppId] = useState<string | null>(null);
 	const springAppIdRef = useRef<string | null>(null);
@@ -325,11 +328,11 @@ const Dock = memo(function Dock() {
 	// behind the pill (which paints above it), so the seam stays fused even
 	// if the measurement is off by a few px at some scale.
 	useEffect(() => {
-		if (showAddPopup || activeFolderStack || showDownloadHub) {
+		if (showAddPopup || activeFolderStack) {
 			const h = dockRef.current?.getBoundingClientRect().height ?? 0;
 			if (h > 0) setPopupBottom(h / (scale || 1) - 14);
 		}
-	}, [showAddPopup, activeFolderStack, showDownloadHub, scale]);
+	}, [showAddPopup, activeFolderStack, scale]);
 
 	const isCurrentlyHovered = isDockHovered || isEdgeHovered;
 	const [interactionState, setInteractionState] = useState<"active" | "grace" | "none">("none");
@@ -339,8 +342,6 @@ const Dock = memo(function Dock() {
 		showAddPopup ||
 		nativeMenuOpen ||
 		!!activeFolderStack ||
-		showDownloadHub ||
-		isSearchExpanded ||
 		hotkeyRevealed;
 
 	const previewTimerRef = useRef<any>(null);
@@ -549,28 +550,9 @@ const Dock = memo(function Dock() {
 			setIsMaximized(event.payload);
 		});
 
-		const unlistenSearchOpen = listen("dock-search-open", () => {
-			setIsSearchExpanded(true);
-			setHoveredApp(null);
-			setWaveCrestX(null);
-		});
-
-		const unlistenSearchClose = listen("dock-search-close", () => {
-			setIsSearchExpanded(false);
-			setHoveredApp(null);
-			setWaveCrestX(null);
-		});
-
 		const unlistenHotkeyToggle = listen("dock-toggle-hotkey", () => {
 			setHotkeyRevealed((prev) => !prev);
 		});
-
-		const unlistenDownloads = listen<DownloadProgressSummary>("downloads-update", (event) => {
-			setDownloadSummary(event.payload);
-		});
-		invoke<DownloadProgressSummary>("get_download_summary")
-			.then(setDownloadSummary)
-			.catch(() => {});
 
 		return () => {
 			unlistenOverlap.then((f) => f());
@@ -578,10 +560,7 @@ const Dock = memo(function Dock() {
 			unlistenEdgeHover.then((f) => f());
 			unlistenVisibility.then((f) => f());
 			unlistenMaximized.then((f) => f());
-			unlistenSearchOpen.then((f) => f());
-			unlistenSearchClose.then((f) => f());
 			unlistenHotkeyToggle.then((f) => f());
-			unlistenDownloads.then((f) => f());
 		};
 	}, []);
 
@@ -598,7 +577,6 @@ const Dock = memo(function Dock() {
 		"bloom-scale": setScale,
 		"bloom-dock-material": setDockMaterial,
 		"bloom-dock-icon-theme": setDockIconTheme,
-		"bloom-dock-downloads-enabled": (val) => setDockDownloadsEnabled(val !== "false"),
 		"bloom-dock-extras-position": setDockExtrasPosition,
 		"bloom-dock-extras-drives": () => setDockExtrasRevision((r) => r + 1),
 		"bloom-dock-extras-recycle-bin": () => setDockExtrasRevision((r) => r + 1),
@@ -1122,9 +1100,6 @@ const Dock = memo(function Dock() {
 	};
 
 	const openSearch = () => {
-		setIsSearchExpanded(true);
-		setHoveredApp(null);
-		setWaveCrestX(null);
 		invoke("open_system_action", { action: "search" }).catch(showActionError);
 	};
 
@@ -1187,37 +1162,12 @@ const Dock = memo(function Dock() {
 			setContextMenu(null);
 			setActiveSubmenu(null);
 			setShowAddPopup(false);
-			setIsSearchExpanded(false);
 			setActiveFolderStack(null);
-			setShowDownloadHub(false);
 		});
 		return () => {
 			unlisten.then((f) => f());
 		};
 	}, []);
-
-	useEffect(() => {
-		if (!isSearchExpanded) return;
-		const interval = setInterval(async () => {
-			try {
-				const open = await invoke<boolean>("is_search_open");
-				if (!open) {
-					setIsSearchExpanded(false);
-				}
-			} catch (_) {}
-		}, 350);
-		const onPointerDown = (e: PointerEvent) => {
-			const target = e.target as HTMLElement | null;
-			if (!target?.closest(".dock-search-pill")) {
-				setIsSearchExpanded(false);
-			}
-		};
-		window.addEventListener("pointerdown", onPointerDown);
-		return () => {
-			clearInterval(interval);
-			window.removeEventListener("pointerdown", onPointerDown);
-		};
-	}, [isSearchExpanded]);
 
 	// The tallest the expanded bar has been, which sets the region's bottom band.
 	const dockBandHeightRef = useRef(0);
@@ -1254,8 +1204,7 @@ const Dock = memo(function Dock() {
 				[".context-menu", 34],
 				[".submenu", 34],
 				[".dock-toast", 20],
-				[".folder-stack-popover", 40],
-				[".download-hub-popover", 40]
+				[".folder-stack-popover", 40]
 			])
 		);
 		// The Add App popup grows from scaleY 0, and that animation doesn't
@@ -1285,24 +1234,6 @@ const Dock = memo(function Dock() {
 		const folderStack = folderStackRef.current;
 		if (folderStack) {
 			const p = folderStack.getBoundingClientRect();
-			wanted.push(padRect({ x: p.left, y: p.top, width: p.width, height: p.height }, 40));
-		}
-		if (showDownloadHub) {
-			const popoverWidth = 360 * scale;
-			const popoverHeight = 380 * scale;
-			const idealLeft = downloadHubAnchorX - popoverWidth / 2;
-			const left = Math.max(16, Math.min(idealLeft, window.innerWidth - popoverWidth - 16));
-			const top = Math.max(10, window.innerHeight - (popupBottom + 20) * scale - popoverHeight);
-			wanted.push({
-				x: Math.round(left) - 20,
-				y: Math.round(top) - 20,
-				width: Math.round(popoverWidth) + 40,
-				height: Math.round(popoverHeight) + 40
-			});
-		}
-		const downloadHub = downloadHubPopoverRef.current;
-		if (downloadHub) {
-			const p = downloadHub.getBoundingClientRect();
 			wanted.push(padRect({ x: p.left, y: p.top, width: p.width, height: p.height }, 40));
 		}
 		sendDockRegion(wanted);
@@ -1343,29 +1274,6 @@ const Dock = memo(function Dock() {
 				const popoverWidth = 360 * scale;
 				const popoverHeight = 400 * scale;
 				const idealLeft = activeFolderStack.anchorX - popoverWidth / 2;
-				const left = Math.max(16, Math.min(idealLeft, window.innerWidth - popoverWidth - 16));
-				const top = Math.max(10, window.innerHeight - (popupBottom + 20) * scale - popoverHeight);
-				rect = {
-					x: Math.round(left),
-					y: Math.round(top),
-					width: Math.round(popoverWidth),
-					height: Math.round(popoverHeight)
-				};
-			}
-			open = true;
-		} else if (showDownloadHub) {
-			if (downloadHubPopoverRef.current) {
-				const r = downloadHubPopoverRef.current.getBoundingClientRect();
-				rect = {
-					x: Math.round(r.x) - 10,
-					y: Math.round(r.y) - 10,
-					width: Math.round(r.width) + 20,
-					height: Math.round(r.height) + 20
-				};
-			} else {
-				const popoverWidth = 360 * scale;
-				const popoverHeight = 380 * scale;
-				const idealLeft = downloadHubAnchorX - popoverWidth / 2;
 				const left = Math.max(16, Math.min(idealLeft, window.innerWidth - popoverWidth - 16));
 				const top = Math.max(10, window.innerHeight - (popupBottom + 20) * scale - popoverHeight);
 				rect = {
@@ -1538,13 +1446,10 @@ const Dock = memo(function Dock() {
 	const orderedDockKeys = useMemo(() => {
 		const keys: string[] = [];
 		if (startItem) keys.push(itemKey(startItem));
-		if (dockSearchEnabled && isSearchExpanded) keys.push("dock-search");
+		if (dockSearchEnabled) keys.push("dock-search");
 		if (dockTaskView) keys.push("task-view");
 		if (dockExtrasPosition === "left") {
 			dockExtras.forEach((e) => keys.push(e.id));
-			if (dockDownloadsEnabled) keys.push("downloads-hub");
-		} else if (dockDownloadsEnabled) {
-			keys.push("downloads-hub");
 		}
 		pinnedItems.forEach((p) => keys.push(itemKey(p)));
 		unpinnedItems.forEach((u) => keys.push(itemKey(u)));
@@ -1552,7 +1457,7 @@ const Dock = memo(function Dock() {
 			dockExtras.forEach((e) => keys.push(e.id));
 		}
 		return keys;
-	}, [startItem, dockSearchEnabled, isSearchExpanded, dockTaskView, pinnedItems, unpinnedItems, dockExtras, dockExtrasPosition, dockDownloadsEnabled]);
+	}, [startItem, dockSearchEnabled, dockTaskView, pinnedItems, unpinnedItems, dockExtras, dockExtrasPosition]);
 
 	const [dockWidth, setDockWidth] = useState(0);
 	const [waveCrestX, setWaveCrestX] = useState<number | null>(null);
@@ -1605,7 +1510,7 @@ const Dock = memo(function Dock() {
 		const currentScale = scale || 1;
 		const cx = (elRect.left + elRect.width / 2 - dockRect.left) / currentScale;
 		setWaveCrestX(cx);
-	}, [activeWaveKey, isDragging, scale, dockWidth, isSearchExpanded, isDockHovered, springAppId]);
+	}, [activeWaveKey, isDragging, scale, dockWidth, isDockHovered, springAppId]);
 
 	useEffect(() => {
 		const isWaveActive = (isDockHovered && !isDragging) || !!springAppId;
@@ -1871,64 +1776,6 @@ const Dock = memo(function Dock() {
 		</motion.div>
 	);
 
-	const renderDownloadHubIcon = () => {
-		if (!dockDownloadsEnabled) return null;
-		const hasActive = (downloadSummary?.active_count ?? 0) > 0;
-		const activeCount = downloadSummary?.active_count ?? 0;
-		const totalSpeed = downloadSummary?.total_speed_bps ?? 0;
-		const tooltipText = hasActive
-			? `Downloading: ${activeCount} file${activeCount === 1 ? "" : "s"} (${formatSpeed(totalSpeed)})`
-			: "Downloads Hub";
-
-		return (
-			<motion.div
-				key="downloads-hub"
-				layout
-				ref={downloadHubAnchorRef}
-				initial={{ opacity: 0, scale: 0 }}
-				animate={{ opacity: 1, scale: 1 }}
-				exit={{ opacity: 0, scale: 0, transition: { duration: 0.12 } }}
-				className="dock-icon-wrapper"
-				data-app-id="downloads-hub"
-				onMouseEnter={() => setHoveredApp("downloads-hub")}
-				onMouseLeave={() => {
-					setHoveredApp(null);
-					setPressedApp(null);
-				}}
-				onClick={(e) => {
-					e.stopPropagation();
-					if (downloadHubAnchorRef.current) {
-						const r = downloadHubAnchorRef.current.getBoundingClientRect();
-						setDownloadHubAnchorX(r.left + r.width / 2);
-					}
-					setShowDownloadHub((prev) => !prev);
-					setActiveFolderStack(null);
-					setContextMenu(null);
-					setShowAddPopup(false);
-				}}
-			>
-				{hoveredApp === "downloads-hub" && <div className="tooltip">{tooltipText}</div>}
-				<motion.div
-					className={`dock-icon dock-download-hub-icon ${hasActive ? "is-downloading" : ""}`}
-					animate={getWaveTransform("downloads-hub")}
-					transition={waveTransition}
-					onPointerDown={() => setPressedApp("downloads-hub")}
-					onPointerUp={() => setPressedApp(null)}
-					onPointerCancel={() => setPressedApp(null)}
-				>
-					<div className="download-hub-icon-inner">
-						<ArrowDown size={20} className={hasActive ? "download-arrow-anim" : ""} />
-						{hasActive && (
-							<span className="download-hub-badge-count">
-								{activeCount}
-							</span>
-						)}
-					</div>
-				</motion.div>
-			</motion.div>
-		);
-	};
-
 	return (
 		<div className={`dock-container ${isDragging ? "dragging" : ""}`} onClick={closeMenu}>
 			<div
@@ -2061,39 +1908,42 @@ const Dock = memo(function Dock() {
 									</motion.div>
 								)}
 
-								{dockSearchEnabled && isSearchExpanded && (
+								{dockSearchEnabled && (
 									<motion.div
-										key="dock-search-bar"
-										initial={{ opacity: 0, scale: 0.85, width: 0 }}
-										animate={{ opacity: 1, scale: 1, width: 170 }}
-										exit={{ opacity: 0, scale: 0.85, width: 0 }}
-										transition={{
-											type: "spring",
-											stiffness: 450,
-											damping: 32
-										}}
-										className="dock-search-wrapper"
-										onMouseEnter={() => {
-											setHoveredApp(null);
-											setPressedApp(null);
-										}}
+										key="dock-search"
+										initial={{ opacity: 0, scale: 0 }}
+										animate={{ opacity: 1, scale: 1 }}
+										exit={{ opacity: 0, scale: 0, transition: { duration: 0.12 } }}
+										className="dock-icon-wrapper"
+										data-app-id="dock-search"
 										onContextMenu={(e) => {
 											e.stopPropagation();
 											e.preventDefault();
 											setContextMenu({ x: e.clientX, y: e.clientY, app: null, searchButton: true });
 										}}
-										onClick={(e) => {
-											e.stopPropagation();
-											openSearch();
+										onMouseEnter={() => setHoveredApp("dock-search")}
+										onMouseLeave={() => {
+											setHoveredApp(null);
+											setPressedApp(null);
 										}}
 									>
-										<div className="dock-search-pill">
+										{hoveredApp === "dock-search" && (
+											<div className="tooltip">Search</div>
+										)}
+										<motion.div
+											className="dock-icon"
+											animate={getWaveTransform("dock-search")}
+											transition={waveTransition}
+											onPointerDown={() => setPressedApp("dock-search")}
+											onPointerUp={() => setPressedApp(null)}
+											onPointerCancel={() => setPressedApp(null)}
+											onClick={(e) => {
+												e.stopPropagation();
+												openSearch();
+											}}
+										>
 											<SearchIcon />
-											<div className="dock-search-content">
-												<span className="dock-search-text">Search</span>
-												<span className="dock-search-cursor" />
-											</div>
-										</div>
+										</motion.div>
 									</motion.div>
 								)}
 
@@ -2139,24 +1989,11 @@ const Dock = memo(function Dock() {
 								{dockExtrasPosition === "left" && dockExtras.length > 0 && (
 									<>
 										{dockExtras.map((extra) => renderExtra(extra))}
-										{renderDownloadHubIcon()}
 										<div
 											className="dock-app-divider"
 											role="separator"
 											aria-orientation="vertical"
 										/>
-									</>
-								)}
-								{(!dockExtras.length || dockExtrasPosition !== "left") && (
-									<>
-										{renderDownloadHubIcon()}
-										{dockDownloadsEnabled && (
-											<div
-												className="dock-app-divider"
-												role="separator"
-												aria-orientation="vertical"
-											/>
-										)}
 									</>
 								)}
 
@@ -2651,12 +2488,152 @@ const Dock = memo(function Dock() {
 						</>
 					) : contextMenu.app ? (
 						<>
+							{/* App Title Header */}
+							<div className="dock-app-menu-header">
+								<div className="dock-app-menu-title" title={contextMenu.app.name}>
+									{contextMenu.app.name}
+								</div>
+								{contextMenu.app.is_running && (
+									<span className="dock-app-menu-running-badge">Running</span>
+								)}
+							</div>
+							<div className="menu-divider" />
+
+							{/* Multiple Windows list */}
+							{contextMenu.app.all_hwnds && contextMenu.app.all_hwnds.length > 1 && (
+								<div className="dock-app-menu-windows">
+									<div className="dock-menu-section-label">Windows ({contextMenu.app.all_hwnds.length})</div>
+									{contextMenu.app.all_hwnds.map(([hwnd, title], idx) => (
+										<div
+											key={hwnd}
+											className="menu-item dock-app-window-item"
+											onClick={async () => {
+												await invoke("focus_window", { hwnd });
+												closeMenu();
+											}}
+										>
+											<span className="dock-app-window-title" title={title || `Window ${idx + 1}`}>
+												{title || `Window ${idx + 1}`}
+											</span>
+										</div>
+									))}
+									<div className="menu-divider" />
+								</div>
+							)}
+
+							{/* Open / Bring to Front */}
+							<div
+								className="menu-item"
+								onClick={() => {
+									handleAppClick(contextMenu.app!);
+									closeMenu();
+								}}
+							>
+								{contextMenu.app.is_running ? "Bring to Front" : "Open"}
+							</div>
+
+							{/* Open New Instance */}
+							{contextMenu.app.is_running && contextMenu.app.path !== "start" && (
+								<div
+									className="menu-item"
+									onClick={() => {
+										handleNewInstance(contextMenu.app!);
+										closeMenu();
+									}}
+								>
+									Open New Instance
+								</div>
+							)}
+
+							{/* Application Options: Run as Admin & Open File Location */}
+							{contextMenu.app.path !== "start" && (
+								<>
+									<div
+										className="menu-item"
+										onClick={async () => {
+											closeMenu();
+											try {
+												await invoke("run_as_admin", { appPath: contextMenu.app!.path });
+											} catch (err) {
+												showActionError(err);
+											}
+										}}
+									>
+										Run as Administrator
+									</div>
+									<div
+										className="menu-item"
+										onClick={async () => {
+											closeMenu();
+											try {
+												await invoke("open_file_location", { appPath: contextMenu.app!.path });
+											} catch (err) {
+												showActionError(err);
+											}
+										}}
+									>
+										Open File Location
+									</div>
+								</>
+							)}
+
+							{/* App Tray Menus */}
+							{contextMenu.app.tray_ids?.map((id, index, ids) => (
+								<div key={id} className="menu-item" onClick={() => void openTrayMenu(id)}>
+									{ids.length > 1 ? `App Tray Menu ${index + 1}` : "App Tray Menu"}
+								</div>
+							))}
+
+							{/* Recent Files */}
+							{appRecentFiles.length > 0 && (
+								<>
+									<div className="menu-divider" />
+									<div className="dock-menu-section-label">Recent Files</div>
+									{appRecentFiles.map((rf) => (
+										<div
+											key={rf.path}
+											className="menu-item dock-recent-item"
+											onClick={() => {
+												closeMenu();
+												invoke("open_dock_extra", { kind: "file", path: rf.path }).catch(showActionError);
+											}}
+											title={rf.path}
+										>
+											<span className="dock-recent-name">{rf.name}</span>
+										</div>
+									))}
+								</>
+							)}
+
+							{/* Close window / Close all windows */}
+							{contextMenu.app.is_running && !contextMenu.app.is_background && (
+								<>
+									<div className="menu-divider" />
+									<div
+										className="menu-item quit"
+										onClick={async () => {
+											const app = contextMenu.app;
+											const hwnds =
+												app?.all_hwnds?.map(([hwnd]) => hwnd) ?? (app?.hwnd ? [app.hwnd] : []);
+											await Promise.all(hwnds.map((hwnd) => invoke("close_window", { hwnd })));
+											closeMenu();
+										}}
+									>
+										Close{" "}
+										{contextMenu.app.all_hwnds && contextMenu.app.all_hwnds.length > 1
+											? "all windows"
+											: "window"}
+									</div>
+								</>
+							)}
+
+							{/* Dock Pin & Customization at the bottom */}
+							<div className="menu-divider" />
 							<div className="menu-item" onClick={() => togglePin(contextMenu.app!)}>
 								{contextMenu.app.is_pinned ? "Unpin from Dock" : "Pin to Dock"}
 							</div>
 							{contextMenu.app.is_pinned && contextMenu.app.path !== "start" && (
 								<>
-									<div className="menu-divider" />
 									<div
 										className="menu-item"
 										onClick={() => {
@@ -2690,103 +2667,6 @@ const Dock = memo(function Dock() {
 											</div>
 										) : null;
 									})()}
-								</>
-							)}
-							<div className="menu-divider" />
-							<div
-								className="menu-item"
-								onClick={() => {
-									setShowAddPopup(true);
-									closeMenu();
-								}}
-							>
-								Add App to Dock...
-							</div>
-							<div
-								className="menu-item has-submenu"
-								onMouseEnter={() => setActiveSubmenu("bloom")}
-								onMouseLeave={() => setActiveSubmenu(null)}
-							>
-								Awaken Options
-								<span className="submenu-arrow">▶</span>
-								<div className="submenu">
-									<div
-										className="menu-item"
-										onClick={() => {
-											invoke("open_settings_window");
-											closeMenu();
-										}}
-									>
-										Open Settings
-									</div>
-									<div className="menu-item" onClick={() => invoke("restart_bloom")}>
-										Restart Awaken
-									</div>
-									<div
-										className="menu-item"
-										onClick={() => {
-											handleClearIconCache();
-											closeMenu();
-										}}
-									>
-										Clear Icon Cache
-									</div>
-									<div className="menu-divider" />
-									<div className="menu-item quit" onClick={() => invoke("quit_bloom")}>
-										Quit Awaken
-									</div>
-								</div>
-							</div>
-							{(() => {
-								// App actions sit together just above Close, like the taskbar's
-								// jump list: the app's tray menus, then a new instance.
-								const app = contextMenu.app!;
-								const canOpenNew = app.is_running && app.path !== "start";
-								if (!app.tray_ids?.length && !canOpenNew) return null;
-								return (
-									<>
-										<div className="menu-divider" />
-										{app.tray_ids?.map((id, index, ids) => (
-											<div key={id} className="menu-item" onClick={() => void openTrayMenu(id)}>
-												{ids.length > 1 ? `Tray menu ${index + 1}` : "App tray menu"}
-											</div>
-										))}
-										{canOpenNew && (
-											<div
-												className="menu-item"
-												onClick={() => {
-													handleNewInstance(app);
-													closeMenu();
-												}}
-											>
-												Open New Instance
-											</div>
-										)}
-									</>
-								);
-							})()}
-							{contextMenu.app.is_running && !contextMenu.app.is_background && (
-								<>
-									{contextMenu.app.path === "start" && !contextMenu.app.tray_ids?.length && (
-										<div className="menu-divider" />
-									)}
-									<div
-										className="menu-item quit"
-										onClick={async () => {
-											// Close every window of the item, like the taskbar's
-											// "Close all windows", not just the first one.
-											const app = contextMenu.app;
-											const hwnds =
-												app?.all_hwnds?.map(([hwnd]) => hwnd) ?? (app?.hwnd ? [app.hwnd] : []);
-											await Promise.all(hwnds.map((hwnd) => invoke("close_window", { hwnd })));
-											closeMenu();
-										}}
-									>
-										Close{" "}
-										{contextMenu.app.all_hwnds && contextMenu.app.all_hwnds.length > 1
-											? "all windows"
-											: "window"}
-									</div>
 								</>
 							)}
 						</>
@@ -2879,26 +2759,6 @@ const Dock = memo(function Dock() {
 							invoke("open_dock_extra", { kind: "folder", path }).catch(showActionError)
 						}
 						onLayoutChange={() => setRegionTick((t) => t + 1)}
-					/>
-				)}
-			</AnimatePresence>
-
-			<AnimatePresence>
-				{showDownloadHub && (
-					<DownloadHubPopover
-						popoverRef={downloadHubPopoverRef}
-						summary={
-							downloadSummary ?? {
-								active_count: 0,
-								total_speed_bps: 0,
-								active_downloads: [],
-								recent_completed: []
-							}
-						}
-						anchorX={downloadHubAnchorX}
-						scale={scale}
-						bottomOffset={popupBottom}
-						onClose={() => setShowDownloadHub(false)}
 					/>
 				)}
 			</AnimatePresence>

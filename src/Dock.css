@@ -448,6 +448,60 @@ body {
 	background: #3b82f6;
 }
 
+/* App-Specific Context Menu Header & Sections */
+.dock-app-menu-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 12px 4px;
+	gap: 8px;
+}
+
+.dock-app-menu-title {
+	font-weight: 600;
+	font-size: 13px;
+	color: #ffffff;
+	max-width: 170px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.dock-app-menu-running-badge {
+	font-size: 9.5px;
+	font-weight: 600;
+	padding: 1px 6px;
+	border-radius: 8px;
+	background: rgba(52, 199, 89, 0.2);
+	color: #34c759;
+	border: 1px solid rgba(52, 199, 89, 0.35);
+	letter-spacing: 0.02em;
+}
+
+.dock-menu-section-label {
+	font-size: 10px;
+	font-weight: 700;
+	color: rgba(255, 255, 255, 0.4);
+	padding: 4px 12px 2px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+.dock-app-window-item,
+.dock-recent-item {
+	font-size: 12px;
+	opacity: 0.9;
+}
+
+.dock-app-window-title,
+.dock-recent-name {
+	display: block;
+	max-width: 190px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .menu-item.has-submenu:hover .submenu {
 	display: flex;
 }

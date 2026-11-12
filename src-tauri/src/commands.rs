@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter, Manager, Window};
 use windows::core::Interface;
@@ -794,6 +795,135 @@ pub async fn launch_new_instance(app_path: String, app_name: Option<String>) {
         let target = pwa_launch_target(&app_path, app_name.as_deref()).unwrap_or(app_path);
         launch_path(&target);
     });
+}
+
+/// Runs the specified application with administrative privileges ("runas" verb).
+#[tauri::command]
+pub async fn run_as_admin(app_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if app_path == "start" || app_path.is_empty() {
+            return Err("Cannot run Start menu as administrator".into());
+        }
+        use std::path::Path;
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+        let mut final_path = if app_path.starts_with('{') {
+            unsafe { crate::tray::resolve_path(&app_path) }
+                .filter(|resolved| Path::new(resolved).exists())
+                .unwrap_or(app_path)
+        } else {
+            app_path
+        };
+
+        if let Some(moved) = crate::utils::moved_squirrel_exe(&final_path) {
+            final_path = moved;
+        }
+
+        let wide_path: Vec<u16> = final_path.encode_utf16().chain(std::iter::once(0)).collect();
+        let wide_verb: Vec<u16> = "runas".encode_utf16().chain(std::iter::once(0)).collect();
+
+        unsafe {
+            let res = ShellExecuteW(
+                None,
+                windows::core::PCWSTR(wide_verb.as_ptr()),
+                windows::core::PCWSTR(wide_path.as_ptr()),
+                None,
+                None,
+                SW_SHOWNORMAL,
+            );
+            if res.0 as usize <= 32 {
+                Err(format!("Elevated launch failed: code {}", res.0 as usize))
+            } else {
+                Ok(())
+            }
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Reveals the app's target executable or shortcut in File Explorer.
+#[tauri::command]
+pub async fn open_file_location(app_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if app_path == "start" || app_path.is_empty() {
+            return Err("Cannot open location of Start menu".into());
+        }
+        use std::path::Path;
+        let mut target_path = if app_path.starts_with('{') {
+            unsafe { crate::tray::resolve_path(&app_path) }
+                .filter(|resolved| Path::new(resolved).exists())
+                .unwrap_or(app_path)
+        } else {
+            app_path
+        };
+
+        if let Some(moved) = crate::utils::moved_squirrel_exe(&target_path) {
+            target_path = moved;
+        }
+
+        let p = Path::new(&target_path);
+        if !p.exists() {
+            return Err(format!("File not found: {}", target_path));
+        }
+
+        let arg = format!("/select,\"{}\"", target_path.replace('/', "\\"));
+        let _ = std::process::Command::new("explorer.exe")
+            .arg(arg)
+            .spawn();
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RecentDocItem {
+    pub name: String,
+    pub path: String,
+}
+
+/// Returns recent document shortcuts for context menu display.
+#[tauri::command]
+pub async fn get_app_recent_files(_app_name: String, _app_path: String) -> Result<Vec<RecentDocItem>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut results = Vec::new();
+        let Ok(appdata) = std::env::var("APPDATA") else {
+            return Ok(results);
+        };
+        let recent_dir = std::path::PathBuf::from(appdata)
+            .join("Microsoft")
+            .join("Windows")
+            .join("Recent");
+        if !recent_dir.exists() {
+            return Ok(results);
+        }
+
+        if let Ok(entries) = std::fs::read_dir(&recent_dir) {
+            let mut candidates: Vec<(String, String, std::time::SystemTime)> = Vec::new();
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("lnk")) != Some(true) {
+                    continue;
+                }
+                let file_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                if file_name.is_empty() {
+                    continue;
+                }
+                let mod_time = entry.metadata().and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH);
+                candidates.push((file_name, path.to_string_lossy().to_string(), mod_time));
+            }
+
+            candidates.sort_by_key(|c| std::cmp::Reverse(c.2));
+            for (name, path, _) in candidates.into_iter().take(4) {
+                results.push(RecentDocItem { name, path });
+            }
+        }
+        Ok(results)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Finds the Start Menu shortcut of an installed PWA that matches a running
@@ -2441,7 +2571,6 @@ pub fn open_system_tray() {
         return;
     }
     tauri::async_runtime::spawn_blocking(move || unsafe {
-        use std::sync::atomic::Ordering;
         use windows::core::PCSTR;
         use windows::Win32::UI::WindowsAndMessaging::{
             FindWindowA, GetWindowLongA, IsWindowVisible, SetLayeredWindowAttributes,

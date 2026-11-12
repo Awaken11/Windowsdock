@@ -83,8 +83,21 @@ import {
 	Maximize2,
 	Copy,
 	FileEdit,
-	Pin
+	Pin,
+	ArrowDown,
+	ChevronDown,
+	ChevronUp,
+	FolderOpen,
+	ExternalLink,
+	CheckCircle2,
+	DownloadCloud,
+	FileDown
 } from "lucide-react";
+import {
+	type DownloadProgressSummary,
+	formatSpeed,
+	formatFileSize
+} from "./components/DownloadHubPopover";
 
 /**
  * The notch has two kinds of content:
@@ -968,6 +981,7 @@ function App() {
 	const timeCenterRef = useRef<HTMLDivElement>(null);
 	const musicBubbleRef = useRef<HTMLButtonElement>(null);
 	const shelfBubbleRef = useRef<HTMLButtonElement>(null);
+	const downloadsBubbleRef = useRef<HTMLButtonElement>(null);
 	const clipboardBubbleRef = useRef<HTMLButtonElement>(null);
 	const notificationBubbleRef = useRef<HTMLButtonElement>(null);
 	const [activeNotification, setActiveNotification] = useState<AppNotification | null>(null);
@@ -985,6 +999,8 @@ function App() {
 			return [];
 		}
 	});
+	const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+	const [downloadSummary, setDownloadSummary] = useState<DownloadProgressSummary | null>(null);
 	const shelfHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const clipboardHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const notificationHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1067,7 +1083,14 @@ function App() {
 		const updateRect = () => {
 			if (bloomRef.current && windowLabel === "main") {
 				// Activity bubbles sit beside the pill and must stay clickable too.
-				const rects = [bloomRef.current, musicBubbleRef.current, shelfBubbleRef.current, clipboardBubbleRef.current, notificationBubbleRef.current]
+				const rects = [
+					bloomRef.current,
+					musicBubbleRef.current,
+					shelfBubbleRef.current,
+					downloadsBubbleRef.current,
+					clipboardBubbleRef.current,
+					notificationBubbleRef.current
+				]
 					.filter((el): el is NonNullable<typeof el> => el !== null)
 					.map((el) => el.getBoundingClientRect());
 				const targetW = getDynamicWidth();
@@ -1591,11 +1614,15 @@ function App() {
 		}
 	}, [shelfItems, shelfPersist]);
 
-	const [shelfTab, setShelfTab] = useState<"files" | "notes">("files");
+	const [shelfTab, setShelfTab] = useState<"files" | "notes" | "downloads">("files");
 	const [scratchpadNote, setScratchpadNote] = useState(
 		() => localStorage.getItem("awaken-scratchpad-note") || ""
 	);
 	const [noteCopied, setNoteCopied] = useState(false);
+
+	useEffect(() => {
+		reportNotchRect.current();
+	}, [shelfTab]);
 
 	useEffect(() => {
 		try {
@@ -2391,6 +2418,18 @@ function App() {
 	const showMusicBubble = musicActivity && timerActive && !isOpen && isVisible && !isHidden;
 	const showShelfBubble =
 		shelfItems.length > 0 && !isOpen && isVisible && !isHidden && bloomMode !== "announcement" && bloomMode !== "shelf";
+	const hasActiveDownloads = (downloadSummary?.active_count ?? 0) > 0;
+	const recentDownloadsCount = downloadSummary?.recent_completed.length ?? 0;
+	const downloadsCount = hasActiveDownloads
+		? (downloadSummary?.active_count ?? 0)
+		: recentDownloadsCount;
+	const showDownloadsBubble =
+		downloadsCount > 0 &&
+		!isOpen &&
+		isVisible &&
+		!isHidden &&
+		bloomMode !== "announcement" &&
+		bloomMode !== "shelf";
 	const showClipboardBubble =
 		clipboardItems.length > 0 && !isOpen && isVisible && !isHidden && bloomMode !== "announcement" && bloomMode !== "clipboard";
 	const showNotificationBubble =
@@ -2693,6 +2732,79 @@ function App() {
 			localStorage.removeItem("bloom-notification-history");
 		} catch {}
 	};
+
+	const deleteGroup = (ids: (string | number)[]) => {
+		const idSet = new Set(ids);
+		setNotificationHistory((prev) => {
+			const next = prev.filter((n) => !idSet.has(n.id));
+			try {
+				localStorage.setItem("bloom-notification-history", JSON.stringify(next));
+			} catch {}
+			return next;
+		});
+		ids.forEach((id) => {
+			invoke("dismiss_notification", { id }).catch(() => {});
+		});
+	};
+
+	const toggleGroup = (key: string) => {
+		setExpandedGroups((prev) => ({
+			...prev,
+			[key]: !prev[key]
+		}));
+	};
+
+	const groupedNotifications = useMemo(() => {
+		const groupsMap = new Map<
+			string,
+			{
+				key: string;
+				app_name: string;
+				app_id: string;
+				title: string;
+				latestTimestamp: number;
+				items: AppNotification[];
+			}
+		>();
+
+		for (const item of notificationHistory) {
+			const cleanTitle = (item.title || "").trim();
+			const key = `${item.app_name}:::${cleanTitle.toLowerCase()}`;
+			let grp = groupsMap.get(key);
+			if (!grp) {
+				grp = {
+					key,
+					app_name: item.app_name,
+					app_id: item.app_id,
+					title: cleanTitle || item.app_name,
+					latestTimestamp: item.timestamp,
+					items: []
+				};
+				groupsMap.set(key, grp);
+			}
+			grp.items.push(item);
+			if (item.timestamp > grp.latestTimestamp) {
+				grp.latestTimestamp = item.timestamp;
+			}
+		}
+
+		return Array.from(groupsMap.values()).sort(
+			(a, b) => b.latestTimestamp - a.latestTimestamp
+		);
+	}, [notificationHistory]);
+
+	useEffect(() => {
+		if (windowLabel !== "main") return;
+		const unlisten = listen<DownloadProgressSummary>("downloads-update", (event) => {
+			setDownloadSummary(event.payload);
+		});
+		invoke<DownloadProgressSummary>("get_download_summary")
+			.then(setDownloadSummary)
+			.catch(() => {});
+		return () => {
+			unlisten.then((f) => f());
+		};
+	}, [windowLabel]);
 
 	useEffect(() => {
 		if (windowLabel !== "main") return;
@@ -3420,7 +3532,7 @@ function App() {
 		if (bloomMode === "notification" && activeNotification) return 390;
 		if (bloomMode === "notifications") return 400;
 		if (isCalendarMode) return 480;
-		if (bloomMode === "shelf") return shelfTab === "notes" ? 420 : 380;
+		if (bloomMode === "shelf") return 420;
 		if (bloomMode === "clipboard") {
 			if (zoomedImageItem) return 520;
 			return displayClipboardItems.length <= 1 ? 320 : 490;
@@ -3462,9 +3574,13 @@ function App() {
 		}
 		if (bloomMode === "notifications") {
 			if (notificationHistory.length === 0) return 170;
-			if (notificationHistory.length === 1) return 165;
-			if (notificationHistory.length === 2) return 255;
-			if (notificationHistory.length === 3) return 345;
+			const totalVisibleRows = groupedNotifications.reduce(
+				(sum, g) => sum + 1 + (expandedGroups[g.key] ? g.items.length : 0),
+				0
+			);
+			if (totalVisibleRows === 1) return 165;
+			if (totalVisibleRows === 2) return 255;
+			if (totalVisibleRows === 3) return 345;
 			return 420;
 		}
 		// Sized to the calendar's week-row count plus the timer's fixed content.
@@ -3473,8 +3589,7 @@ function App() {
 		// hover during an OS drag) and is sized to exactly one row of tiles,
 		// plus room for the scrollbar once the tiles overflow it.
 		if (bloomMode === "shelf") {
-			if (shelfTab === "notes") return 260;
-			return shelfItems.length === 0 ? 140 : 196;
+			return 280;
 		}
 		if (bloomMode === "clipboard") {
 			if (zoomedImageItem) return 340;
@@ -3554,6 +3669,11 @@ function App() {
 		8 +
 		(showNotificationBubble ? notifBubbleWidth + 6 : 0) +
 		(showClipboardBubble ? clipBubbleWidth + 6 : 0);
+
+	// Side-by-side positioning for activity bubbles on the left of the collapsed notch
+	const shelfBubbleWidth = shelfItems.length >= 100 ? 56 : shelfItems.length >= 10 ? 49 : 42;
+	const downloadsBubbleMarginRight =
+		getDynamicWidth() / 2 + 8 + (showShelfBubble ? shelfBubbleWidth + 6 : 0);
 
 	return (
 		<div className="screen" style={{ overflow: "hidden" }}>
@@ -4880,6 +5000,19 @@ function App() {
 														<span>Scratchpad</span>
 														{scratchpadNote.trim().length > 0 && <span className="shelf-notes-dot" />}
 													</button>
+													<button
+														type="button"
+														className={`shelf-tab-btn ${shelfTab === "downloads" ? "active" : ""}`}
+														onClick={() => setShelfTab("downloads")}
+													>
+														<ArrowDown size={12} strokeWidth={2.2} className={hasActiveDownloads ? "download-pulse-icon" : ""} />
+														<span>Downloads</span>
+														{downloadsCount > 0 && (
+															<span className={`shelf-header-badge ${hasActiveDownloads ? "badge-active" : ""}`}>
+																{downloadsCount}
+															</span>
+														)}
+													</button>
 												</div>
 												{shelfTab === "files" && shelfItems.length > 0 && (
 													<button
@@ -4895,153 +5028,315 @@ function App() {
 														<span>Clear</span>
 													</button>
 												)}
+												{shelfTab === "downloads" && (
+													<button
+														type="button"
+														className="shelf-clear-btn"
+														onClick={() => invoke("open_downloads_folder").catch(() => {})}
+														title="Open Downloads folder in File Explorer"
+													>
+														<FolderOpen size={12} />
+														<span>Folder</span>
+													</button>
+												)}
 											</div>
-											{shelfTab === "notes" ? (
-												<div className="shelf-scratchpad-view">
-													<textarea
-														className="shelf-scratchpad-textarea"
-														placeholder="Write quick notes, markdown snippets, or paste text..."
-														value={scratchpadNote}
-														onChange={(e) => setScratchpadNote(e.target.value)}
-														autoFocus
-													/>
-													<div className="shelf-scratchpad-footer">
-														<div className="shelf-scratchpad-stats">
-															{scratchpadNote.trim().length === 0
-																? "Empty note"
-																: `${scratchpadNote.trim().split(/\s+/).filter(Boolean).length} words · ${scratchpadNote.length} chars`}
-														</div>
-														<div className="shelf-scratchpad-actions">
-															{scratchpadNote.length > 0 && (
+											<AnimatePresence mode="wait">
+												{shelfTab === "notes" ? (
+													<motion.div
+														key="shelf-tab-notes"
+														initial={{ opacity: 0, y: 4 }}
+														animate={{ opacity: 1, y: 0 }}
+														exit={{ opacity: 0, y: -4 }}
+														transition={{ duration: 0.12 }}
+														className="shelf-scratchpad-view"
+													>
+														<textarea
+															className="shelf-scratchpad-textarea"
+															placeholder="Write quick notes, markdown snippets, or paste text..."
+															value={scratchpadNote}
+															onChange={(e) => setScratchpadNote(e.target.value)}
+															autoFocus
+														/>
+														<div className="shelf-scratchpad-footer">
+															<div className="shelf-scratchpad-stats">
+																{scratchpadNote.trim().length === 0
+																	? "Empty note"
+																	: `${scratchpadNote.trim().split(/\s+/).filter(Boolean).length} words · ${scratchpadNote.length} chars`}
+															</div>
+															<div className="shelf-scratchpad-actions">
+																{scratchpadNote.length > 0 && (
+																	<button
+																		type="button"
+																		className="shelf-scratchpad-btn"
+																		title="Clear note"
+																		onClick={() => setScratchpadNote("")}
+																	>
+																		<Trash2 size={11} />
+																		<span>Clear</span>
+																	</button>
+																)}
 																<button
 																	type="button"
-																	className="shelf-scratchpad-btn"
-																	title="Clear note"
-																	onClick={() => setScratchpadNote("")}
+																	className={`shelf-scratchpad-btn primary ${noteCopied ? "copied" : ""}`}
+																	title="Copy note to clipboard"
+																	onClick={async () => {
+																		try {
+																			await writeText(scratchpadNote);
+																		} catch {
+																			await navigator.clipboard.writeText(scratchpadNote).catch(() => {});
+																		}
+																		setNoteCopied(true);
+																		setTimeout(() => setNoteCopied(false), 1200);
+																	}}
 																>
-																	<Trash2 size={11} />
-																	<span>Clear</span>
+																	{noteCopied ? <Check size={11} /> : <Copy size={11} />}
+																	<span>{noteCopied ? "Copied" : "Copy Note"}</span>
 																</button>
-															)}
-															<button
-																type="button"
-																className={`shelf-scratchpad-btn primary ${noteCopied ? "copied" : ""}`}
-																title="Copy note to clipboard"
-																onClick={async () => {
-																	try {
-																		await writeText(scratchpadNote);
-																	} catch {
-																		await navigator.clipboard.writeText(scratchpadNote).catch(() => {});
-																	}
-																	setNoteCopied(true);
-																	setTimeout(() => setNoteCopied(false), 1200);
-																}}
-															>
-																{noteCopied ? <Check size={11} /> : <Copy size={11} />}
-																<span>{noteCopied ? "Copied" : "Copy Note"}</span>
-															</button>
+															</div>
 														</div>
-													</div>
-												</div>
-											) : shelfItems.length === 0 ? (
-												<div className="shelf-empty">
-													<span>Drop files or selected text here</span>
-												</div>
-											) : (
-													<div
-														className={`shelf-items-grid ${shelfOverflowing ? "overflowing" : ""}`}
-														ref={shelfGridRef}
+													</motion.div>
+												) : shelfTab === "downloads" ? (
+													<motion.div
+														key="shelf-tab-downloads"
+														initial={{ opacity: 0, y: 4 }}
+														animate={{ opacity: 1, y: 0 }}
+														exit={{ opacity: 0, y: -4 }}
+														transition={{ duration: 0.12 }}
+														className="shelf-downloads-view"
 													>
-														<AnimatePresence mode="popLayout" onExitComplete={measureShelfOverflow}>
-															{shelfItems.map((item) => {
-																const preview = item.path ? shelfThumbs[item.path] : undefined;
-																const thumb = preview?.thumb;
-																return (
-																	<motion.div
-																		key={item.id}
-																		layout
-																		initial={
-																			shelfNewIdsRef.current.has(item.id)
-																				? { opacity: 0, scale: 0.82 }
-																				: false
-																		}
-																		animate={{ opacity: 1, scale: 1 }}
-																		exit={{
-																			opacity: 0,
-																			scale: 0.82,
-																			transition: { duration: 0.16, ease: "easeOut" }
-																		}}
-																		transition={{
-																			type: "spring",
-																			stiffness: 520,
-																			damping: 38,
-																			mass: 0.7
-																		}}
-																		className={`shelf-tile ${item.type === "text" || (!thumb && preview?.text) ? "is-text" : ""}`}
-																		title={
-																			item.type === "text" ? item.text?.slice(0, 1000) : item.path
-																		}
-																		onPointerDown={(e) => handleShelfPointerDown(e, item)}
-																		onPointerMove={(e) => handleShelfPointerMove(e, item)}
-																		onClick={(e) => handleShelfTileClick(e, item)}
+														{hasActiveDownloads && (
+															<div className="shelf-downloads-section">
+																<div className="shelf-downloads-section-title">
+																	<span>Active ({downloadSummary?.active_count ?? 0})</span>
+																	<span className="shelf-downloads-total-speed">
+																		{formatSpeed(downloadSummary?.total_speed_bps ?? 0)}
+																	</span>
+																</div>
+																<div className="shelf-downloads-list">
+																	{downloadSummary?.active_downloads.map((item) => (
+																		<div key={item.id} className="shelf-download-card active">
+																			<div className="shelf-download-icon">
+																				<FileDown size={16} />
+																			</div>
+																			<div className="shelf-download-info">
+																				<div className="shelf-download-name" title={item.name}>
+																					{item.name}
+																				</div>
+																				<div className="shelf-download-progress-track">
+																					<div
+																						className="shelf-download-progress-fill"
+																						style={{
+																							width: `${Math.min(100, Math.max(3, item.percentage ?? 0))}%`
+																						}}
+																					/>
+																				</div>
+																				<div className="shelf-download-meta">
+																					<span>
+																						{formatFileSize(item.bytes_downloaded)}
+																						{item.total_bytes ? ` / ${formatFileSize(item.total_bytes)}` : ""}
+																						{item.percentage !== undefined ? ` · ${item.percentage.toFixed(0)}%` : ""}
+																					</span>
+																					<span className="shelf-download-speed">
+																						{formatSpeed(item.speed_bytes_per_sec)}
+																					</span>
+																				</div>
+																			</div>
+																			<div className="shelf-download-actions">
+																				<button
+																					type="button"
+																					className="shelf-dl-action-btn"
+																					title="Show in Folder"
+																					onClick={() =>
+																						invoke("show_download_in_folder", { path: item.path }).catch(() => {})
+																					}
+																				>
+																					<FolderOpen size={12} />
+																				</button>
+																			</div>
+																		</div>
+																	))}
+																</div>
+															</div>
+														)}
+
+														{downloadSummary?.recent_completed && downloadSummary.recent_completed.length > 0 && (
+															<div className="shelf-downloads-section">
+																<div className="shelf-downloads-section-title">
+																	<span>Recent Downloads</span>
+																</div>
+																<div className="shelf-downloads-list">
+																	{downloadSummary.recent_completed.slice(0, 5).map((item) => (
+																		<div key={item.id} className="shelf-download-card completed">
+																			<div className="shelf-download-icon completed">
+																				<CheckCircle2 size={16} />
+																			</div>
+																			<div className="shelf-download-info">
+																				<div className="shelf-download-name" title={item.name}>
+																					{item.name}
+																				</div>
+																				<div className="shelf-download-meta">
+																					<span>{formatFileSize(item.bytes_downloaded)}</span>
+																					<span className="shelf-download-status">Completed</span>
+																				</div>
+																			</div>
+																			<div className="shelf-download-actions">
+																				<button
+																					type="button"
+																					className="shelf-dl-action-btn"
+																					title="Show in Folder"
+																					onClick={() =>
+																						invoke("show_download_in_folder", { path: item.path }).catch(() => {})
+																					}
+																				>
+																					<FolderOpen size={12} />
+																				</button>
+																				<button
+																					type="button"
+																					className="shelf-dl-action-btn primary"
+																					title="Open File"
+																					onClick={() =>
+																						invoke("open_download_file", { path: item.path }).catch(() => {})
+																					}
+																				>
+																					<ExternalLink size={12} />
+																				</button>
+																			</div>
+																		</div>
+																	))}
+																</div>
+															</div>
+														)}
+
+														{!hasActiveDownloads &&
+															(!downloadSummary?.recent_completed || downloadSummary.recent_completed.length === 0) && (
+																<div className="shelf-downloads-empty">
+																	<DownloadCloud size={24} strokeWidth={1.8} />
+																	<div className="shelf-downloads-empty-title">No Active Downloads</div>
+																	<div className="shelf-downloads-empty-subtitle">
+																		Browser and manager downloads appear here automatically with speed & progress.
+																	</div>
+																	<button
+																		type="button"
+																		className="shelf-open-folder-btn"
+																		onClick={() => invoke("open_downloads_folder").catch(() => {})}
 																	>
-																		<div className="shelf-tile-preview">
-																			{item.type === "text" ? (
-																				<div className="shelf-tile-text">
-																					<Type
-																						size={11}
-																						strokeWidth={2}
-																						className="shelf-tile-text-icon"
-																					/>
-																					<span className="shelf-tile-text-body">{item.text}</span>
-																				</div>
-																			) : !thumb && preview?.text ? (
-																				<div className="shelf-tile-text">
-																					<ShelfTypeIcon
-																						name={item.name}
-																						folder={false}
-																						size={11}
-																						className="shelf-tile-text-icon"
-																					/>
-																					<span className="shelf-tile-text-body">{preview.text}</span>
-																				</div>
-																			) : (
-																				<>
-																					<div className="shelf-tile-placeholder">
-																						{preview && !thumb ? (
+																		<FolderOpen size={12} />
+																		<span>Open Downloads Folder</span>
+																	</button>
+																</div>
+															)}
+													</motion.div>
+												) : (
+													<motion.div
+														key="shelf-tab-files"
+														initial={{ opacity: 0, y: 4 }}
+														animate={{ opacity: 1, y: 0 }}
+														exit={{ opacity: 0, y: -4 }}
+														transition={{ duration: 0.12 }}
+														className="shelf-files-wrapper"
+													>
+														{shelfItems.length === 0 ? (
+															<div className="shelf-empty">
+																<span>Drop files or selected text here</span>
+															</div>
+														) : (
+															<div
+																className={`shelf-items-grid ${shelfOverflowing ? "overflowing" : ""}`}
+																ref={shelfGridRef}
+															>
+																<AnimatePresence mode="popLayout" onExitComplete={measureShelfOverflow}>
+																	{shelfItems.map((item) => {
+																		const preview = item.path ? shelfThumbs[item.path] : undefined;
+																		const thumb = preview?.thumb;
+																		return (
+																			<motion.div
+																				key={item.id}
+																				layout
+																				initial={
+																					shelfNewIdsRef.current.has(item.id)
+																						? { opacity: 0, scale: 0.82 }
+																						: false
+																				}
+																				animate={{ opacity: 1, scale: 1 }}
+																				exit={{
+																					opacity: 0,
+																					scale: 0.82,
+																					transition: { duration: 0.16, ease: "easeOut" }
+																				}}
+																				transition={{
+																					type: "spring",
+																					stiffness: 520,
+																					damping: 38,
+																					mass: 0.7
+																				}}
+																				className={`shelf-tile ${item.type === "text" || (!thumb && preview?.text) ? "is-text" : ""}`}
+																				title={
+																					item.type === "text" ? item.text?.slice(0, 1000) : item.path
+																				}
+																				onPointerDown={(e) => handleShelfPointerDown(e, item)}
+																				onPointerMove={(e) => handleShelfPointerMove(e, item)}
+																				onClick={(e) => handleShelfTileClick(e, item)}
+																			>
+																				<div className="shelf-tile-preview">
+																					{item.type === "text" ? (
+																						<div className="shelf-tile-text">
+																							<Type
+																								size={11}
+																								strokeWidth={2}
+																								className="shelf-tile-text-icon"
+																							/>
+																							<span className="shelf-tile-text-body">{item.text}</span>
+																						</div>
+																					) : !thumb && preview?.text ? (
+																						<div className="shelf-tile-text">
 																							<ShelfTypeIcon
 																								name={item.name}
-																								folder={preview.folder}
+																								folder={false}
+																								size={11}
+																								className="shelf-tile-text-icon"
 																							/>
-																						) : null}
-																					</div>
-																					{thumb ? (
-																						<img src={thumb} alt="" draggable={false} />
-																					) : null}
-																				</>
-																			)}
-																		</div>
-																		<span className="shelf-tile-name">
-																			{item.type === "text"
-																				? `Text · ${item.text?.length ?? 0} chars`
-																				: item.name}
-																		</span>
-																		<button
-																			className="shelf-tile-remove"
-																			title="Remove from shelf"
-																			onClick={(e) => {
-																				e.stopPropagation();
-																				removeShelfItem(item.id);
-																			}}
-																		>
-																			<X size={11} strokeWidth={2.5} />
-																		</button>
-																	</motion.div>
-																);
-															})}
-														</AnimatePresence>
-													</div>
+																							<span className="shelf-tile-text-body">{preview.text}</span>
+																						</div>
+																					) : (
+																						<>
+																							<div className="shelf-tile-placeholder">
+																								{preview && !thumb ? (
+																									<ShelfTypeIcon
+																										name={item.name}
+																										folder={preview.folder}
+																									/>
+																								) : null}
+																							</div>
+																							{thumb ? (
+																								<img src={thumb} alt="" draggable={false} />
+																							) : null}
+																						</>
+																					)}
+																				</div>
+																				<span className="shelf-tile-name">
+																					{item.type === "text"
+																						? `Text · ${item.text?.length ?? 0} chars`
+																						: item.name}
+																				</span>
+																				<button
+																					className="shelf-tile-remove"
+																					title="Remove from shelf"
+																					onClick={(e) => {
+																						e.stopPropagation();
+																						removeShelfItem(item.id);
+																					}}
+																				>
+																					<X size={11} strokeWidth={2.5} />
+																				</button>
+																			</motion.div>
+																		);
+																	})}
+																</AnimatePresence>
+															</div>
+														)}
+													</motion.div>
 												)}
+											</AnimatePresence>
 										</motion.div>
 									)}
 								</AnimatePresence>
@@ -5425,51 +5720,186 @@ function App() {
 													}}
 												>
 													<AnimatePresence mode="popLayout">
-														{notificationHistory.map((item) => (
-															<motion.div
-																key={item.id}
-																className="notif-card"
-																layout
-																initial={{ opacity: 0, y: -4 }}
-																animate={{ opacity: 1, y: 0 }}
-																exit={{ opacity: 0, scale: 0.95 }}
-																transition={{ duration: 0.15 }}
-																onClick={() => {
-																	invoke("focus_notification_app", {
-																		appName: item.app_name,
-																		appId: item.app_id
-																	}).catch(() => {});
-																	setIsOpen(false);
-																	setBloomMode(collapsedMode);
-																}}
-															>
-																<div className="notif-card-badge">
-																	<AppBrandIcon appName={item.app_name} appId={item.app_id} />
-																</div>
-																<div className="notif-card-content">
-																	<div className="notif-card-top">
-																		<span className="notif-card-app">{item.app_name}</span>
-																		<span className="notif-card-dot">•</span>
-																		<span className="notif-card-time">
-																			{formatRelativeTime(item.timestamp)}
-																		</span>
-																	</div>
-																	<div className="notif-card-title">{item.title}</div>
-																	{item.body ? <div className="notif-card-body">{item.body}</div> : null}
-																</div>
-																<button
-																	type="button"
-																	className="notif-card-delete-btn"
-																	onClick={(e) => {
-																		e.stopPropagation();
-																		deleteNotification(item.id);
-																	}}
-																	title="Remove notification"
+														{groupedNotifications.map((group) => {
+															const isExpanded = !!expandedGroups[group.key];
+															const isSingle = group.items.length === 1;
+															const topItem = group.items[0];
+
+															const focusApp = () => {
+																invoke("focus_notification_app", {
+																	appName: group.app_name,
+																	appId: group.app_id
+																}).catch(() => {});
+																setIsOpen(false);
+																setBloomMode(collapsedMode);
+															};
+
+															if (isSingle) {
+																return (
+																	<motion.div
+																		key={topItem.id}
+																		className="notif-card"
+																		layout
+																		initial={{ opacity: 0, y: -4 }}
+																		animate={{ opacity: 1, y: 0 }}
+																		exit={{ opacity: 0, scale: 0.95 }}
+																		transition={{ duration: 0.15 }}
+																		onDoubleClick={(e) => {
+																			e.stopPropagation();
+																			focusApp();
+																		}}
+																	>
+																		<div className="notif-card-badge">
+																			<AppBrandIcon appName={topItem.app_name} appId={topItem.app_id} />
+																		</div>
+																		<div className="notif-card-content">
+																			<div className="notif-card-top">
+																				<span className="notif-card-app">{topItem.app_name}</span>
+																				<span className="notif-card-dot">•</span>
+																				<span className="notif-card-time">
+																					{formatRelativeTime(topItem.timestamp)}
+																				</span>
+																			</div>
+																			<div className="notif-card-title">{topItem.title}</div>
+																			{topItem.body ? <div className="notif-card-body">{topItem.body}</div> : null}
+																		</div>
+																		<button
+																			type="button"
+																			className="notif-card-open-btn"
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				focusApp();
+																			}}
+																			title="Open App (or double-tap)"
+																		>
+																			<ExternalLink size={11} strokeWidth={2.4} />
+																		</button>
+																		<button
+																			type="button"
+																			className="notif-card-delete-btn"
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				deleteNotification(topItem.id);
+																			}}
+																			title="Remove notification"
+																		>
+																			<X size={11} strokeWidth={2.4} />
+																		</button>
+																	</motion.div>
+																);
+															}
+
+															return (
+																<motion.div
+																	key={group.key}
+																	className={`notif-group-card ${isExpanded ? "expanded" : ""}`}
+																	layout
+																	initial={{ opacity: 0, y: -4 }}
+																	animate={{ opacity: 1, y: 0 }}
+																	exit={{ opacity: 0, scale: 0.95 }}
+																	transition={{ duration: 0.15 }}
 																>
-																	<X size={11} strokeWidth={2.4} />
-																</button>
-															</motion.div>
-														))}
+																	<div
+																		className="notif-group-header"
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			toggleGroup(group.key);
+																		}}
+																		onDoubleClick={(e) => {
+																			e.stopPropagation();
+																			focusApp();
+																		}}
+																		title="Tap to expand · Double-tap to open app"
+																	>
+																		<div className="notif-card-badge">
+																			<AppBrandIcon appName={group.app_name} appId={group.app_id} />
+																		</div>
+																		<div className="notif-card-content">
+																			<div className="notif-card-top">
+																				<span className="notif-card-app">{group.app_name}</span>
+																				<span className="notif-card-dot">•</span>
+																				<span className="notif-card-time">
+																					{formatRelativeTime(group.latestTimestamp)}
+																				</span>
+																				<span className="notif-count-pill">{group.items.length}</span>
+																			</div>
+																			<div className="notif-card-title">{group.title}</div>
+																			<div className="notif-card-body">
+																				{topItem.body || `${group.items.length} notifications`}
+																			</div>
+																		</div>
+																		<div className="notif-group-actions">
+																			<button
+																				type="button"
+																				className="notif-expand-btn"
+																				onClick={(e) => {
+																					e.stopPropagation();
+																					toggleGroup(group.key);
+																				}}
+																				title={isExpanded ? "Collapse" : "Expand"}
+																			>
+																				{isExpanded ? (
+																					<ChevronUp size={13} strokeWidth={2.4} />
+																				) : (
+																					<ChevronDown size={13} strokeWidth={2.4} />
+																				)}
+																			</button>
+																			<button
+																				type="button"
+																				className="notif-card-delete-btn"
+																				onClick={(e) => {
+																					e.stopPropagation();
+																					deleteGroup(group.items.map((i) => i.id));
+																				}}
+																				title="Clear all from this sender"
+																			>
+																				<X size={11} strokeWidth={2.4} />
+																			</button>
+																		</div>
+																	</div>
+
+																	{isExpanded && (
+																		<div className="notif-group-children">
+																			{group.items.map((subItem) => (
+																				<div
+																					key={subItem.id}
+																					className="notif-child-card"
+																					onDoubleClick={(e) => {
+																						e.stopPropagation();
+																						focusApp();
+																					}}
+																				>
+																					<div className="notif-child-indicator" />
+																					<div className="notif-child-content">
+																						<div className="notif-child-top">
+																							<span className="notif-child-time">
+																								{formatRelativeTime(subItem.timestamp)}
+																							</span>
+																						</div>
+																						{subItem.body ? (
+																							<div className="notif-child-body">{subItem.body}</div>
+																						) : (
+																							<div className="notif-child-body">{subItem.title}</div>
+																						)}
+																					</div>
+																					<button
+																						type="button"
+																						className="notif-card-delete-btn child-del"
+																						onClick={(e) => {
+																							e.stopPropagation();
+																							deleteNotification(subItem.id);
+																						}}
+																						title="Remove notification"
+																					>
+																						<X size={11} strokeWidth={2.4} />
+																					</button>
+																				</div>
+																			))}
+																		</div>
+																	)}
+																</motion.div>
+															);
+														})}
 													</AnimatePresence>
 												</div>
 											)}
@@ -5519,6 +5949,38 @@ function App() {
 						>
 							<Inbox size={12} strokeWidth={2.4} />
 							<span>{shelfItems.length}</span>
+						</motion.button>
+					)}
+				</AnimatePresence>
+				{/* Downloads activity bubble on the left of the collapsed pill (beside files holder) */}
+				<AnimatePresence onExitComplete={() => reportNotchRect.current()}>
+					{showDownloadsBubble && (
+						<motion.button
+							key="downloads-bubble"
+							ref={downloadsBubbleRef}
+							type="button"
+							className={`activity-bubble downloads-bubble ${isHovered ? "expanded" : ""} ${hasActiveDownloads ? "active-downloading" : ""}`}
+							aria-label={`Open downloads: ${downloadsCount} file${downloadsCount === 1 ? "" : "s"}`}
+							style={{ right: "50%" }}
+							initial={{ opacity: 0, scale: 0.4, x: 28, marginRight: downloadsBubbleMarginRight }}
+							animate={{ opacity: 1, scale: 1, x: 0, marginRight: downloadsBubbleMarginRight }}
+							exit={{ opacity: 0, scale: 0.4, x: 28 }}
+							transition={{
+								type: "spring",
+								stiffness: 400,
+								damping: 31,
+								opacity: { duration: 0.15 }
+							}}
+							onAnimationComplete={() => reportNotchRect.current()}
+							onClick={(e) => {
+								e.stopPropagation();
+								setIsHovered(true);
+								setShelfTab("downloads");
+								openNotch("shelf");
+							}}
+						>
+							<ArrowDown size={12} strokeWidth={2.4} className={hasActiveDownloads ? "download-pulse-icon" : ""} />
+							<span>{downloadsCount}</span>
 						</motion.button>
 					)}
 				</AnimatePresence>

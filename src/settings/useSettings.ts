@@ -130,7 +130,7 @@ export function useSettings() {
 		() => localStorage.getItem("bloom-dock-extras-recycle-bin") !== "false"
 	);
 	const [dockSearchEnabled, setDockSearchEnabled] = useState(
-		() => localStorage.getItem("bloom-dock-search-enabled") !== "false"
+		() => localStorage.getItem("bloom-dock-search-enabled") === "true"
 	);
 	// Off unless turned on, so existing docks don't change.
 	const [dockTaskView, setDockTaskView] = useState(
@@ -258,7 +258,7 @@ export function useSettings() {
 			apply(getVal("bloom-dock-extras-position"), setDockExtrasPosition, (v) => v);
 			apply(getVal("bloom-dock-extras-drives"), setDockExtrasDrives, readBool);
 			apply(getVal("bloom-dock-extras-recycle-bin"), setDockExtrasRecycleBin, readBool);
-			apply(getVal("bloom-dock-search-enabled"), setDockSearchEnabled, (v) => v !== "false");
+			apply(getVal("bloom-dock-search-enabled"), setDockSearchEnabled, readBool);
 			apply(getVal("bloom-dock-task-view"), setDockTaskView, readBool);
 			apply(getVal("bloom-dock-extras-hidden-drives"), setDockExtrasHiddenDrives, (v) => v);
 			apply(getVal("bloom-dock-extras-folders"), setDockExtrasFolders, (v) => v);

@@ -2102,9 +2102,19 @@ img {
 	display: flex;
 	flex-direction: column;
 	width: 100%;
-	height: calc(100% - 32px);
-	min-height: 190px;
+	height: 100%;
+	max-height: 232px;
 	box-sizing: border-box;
+}
+
+.shelf-files-wrapper {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	height: 100%;
+	max-height: 232px;
+	box-sizing: border-box;
+	overflow: hidden;
 }
 
 .shelf-scratchpad-textarea {
@@ -3616,6 +3626,418 @@ img {
 .notif-card-delete-btn:hover {
 	background: rgba(255, 69, 58, 0.2);
 	color: #ff453a;
+}
+
+/* Downloads activity bubble on Notch */
+.activity-bubble.downloads-bubble {
+	padding: 0 9px;
+	font-size: 11px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	color: #00f2fe;
+}
+
+.activity-bubble.downloads-bubble.active-downloading {
+	background: rgba(0, 242, 254, 0.16);
+	box-shadow: 0 0 12px rgba(0, 242, 254, 0.3);
+}
+
+.download-pulse-icon {
+	animation: downloadPulseBounce 1.2s ease-in-out infinite;
+}
+
+@keyframes downloadPulseBounce {
+	0%, 100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(2px);
+	}
+}
+
+.shelf-header-badge.badge-active {
+	background: rgba(0, 242, 254, 0.25);
+	color: #00f2fe;
+}
+
+/* Grouped notifications */
+.notif-group-card {
+	display: flex;
+	flex-direction: column;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(255, 255, 255, 0.06);
+	border-radius: 10px;
+	overflow: hidden;
+	transition: background 0.15s ease, border-color 0.15s ease;
+	flex-shrink: 0;
+	box-sizing: border-box;
+}
+
+.notif-group-card:hover {
+	background: rgba(255, 255, 255, 0.08);
+	border-color: rgba(255, 255, 255, 0.1);
+}
+
+.notif-group-card.expanded {
+	background: rgba(255, 255, 255, 0.07);
+	border-color: rgba(0, 242, 254, 0.2);
+}
+
+.notif-group-header {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px;
+	cursor: pointer;
+	user-select: none;
+}
+
+.notif-count-pill {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 5px;
+	border-radius: 8px;
+	background: rgba(0, 242, 254, 0.18);
+	color: #00f2fe;
+	font-size: 9.5px;
+	font-weight: 700;
+	margin-left: auto;
+}
+
+.notif-group-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+.notif-expand-btn {
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(255, 255, 255, 0.08);
+	border: none;
+	color: rgba(255, 255, 255, 0.6);
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.notif-expand-btn:hover {
+	background: rgba(255, 255, 255, 0.15);
+	color: #ffffff;
+}
+
+.notif-group-header:hover .notif-card-delete-btn {
+	opacity: 1;
+}
+
+.notif-group-children {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 0 8px 8px 14px;
+	border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.notif-child-card {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 8px;
+	background: rgba(0, 0, 0, 0.2);
+	border: 1px solid rgba(255, 255, 255, 0.04);
+	border-radius: 7px;
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+
+.notif-child-card:hover {
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.notif-child-card:hover .notif-card-delete-btn.child-del {
+	opacity: 1;
+}
+
+.notif-child-indicator {
+	width: 3px;
+	height: 16px;
+	border-radius: 2px;
+	background: rgba(0, 242, 254, 0.4);
+	flex-shrink: 0;
+}
+
+.notif-child-content {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.notif-child-top {
+	display: flex;
+	align-items: center;
+	margin-bottom: 1px;
+}
+
+.notif-child-time {
+	font-size: 9.5px;
+	color: rgba(255, 255, 255, 0.4);
+}
+
+.notif-child-body {
+	font-size: 11px;
+	color: rgba(255, 255, 255, 0.85);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.notif-card-open-btn {
+	opacity: 0;
+	flex-shrink: 0;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(255, 255, 255, 0.08);
+	border: none;
+	color: rgba(255, 255, 255, 0.6);
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.notif-card:hover .notif-card-open-btn {
+	opacity: 1;
+}
+
+.notif-card-open-btn:hover {
+	background: rgba(0, 242, 254, 0.2);
+	color: #00f2fe;
+}
+
+/* Shelf Downloads View */
+.shelf-downloads-view {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 4px 6px 8px 6px;
+	overflow-y: auto;
+	height: 100%;
+	max-height: 232px;
+	box-sizing: border-box;
+}
+
+.shelf-downloads-view::-webkit-scrollbar {
+	width: 4px;
+}
+
+.shelf-downloads-view::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.15);
+	border-radius: 4px;
+}
+
+.shelf-downloads-section {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.shelf-downloads-section-title {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: rgba(255, 255, 255, 0.45);
+	padding: 0 2px;
+}
+
+.shelf-downloads-total-speed {
+	color: #00f2fe;
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+.shelf-downloads-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.shelf-download-card {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(255, 255, 255, 0.05);
+	border-radius: 9px;
+	transition: background 0.15s ease;
+}
+
+.shelf-download-card:hover {
+	background: rgba(255, 255, 255, 0.07);
+}
+
+.shelf-download-card.active {
+	border-color: rgba(0, 242, 254, 0.18);
+	background: rgba(0, 242, 254, 0.03);
+}
+
+.shelf-download-icon {
+	width: 30px;
+	height: 30px;
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0, 242, 254, 0.12);
+	color: #00f2fe;
+	flex-shrink: 0;
+}
+
+.shelf-download-icon.completed {
+	background: rgba(52, 199, 89, 0.12);
+	color: #34c759;
+}
+
+.shelf-download-info {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.shelf-download-name {
+	font-size: 11.5px;
+	font-weight: 600;
+	color: #ffffff;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.shelf-download-progress-track {
+	width: 100%;
+	height: 4px;
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 2px;
+	overflow: hidden;
+}
+
+.shelf-download-progress-fill {
+	height: 100%;
+	background: linear-gradient(90deg, #00f2fe 0%, #4facfe 100%);
+	border-radius: 2px;
+	transition: width 0.3s ease;
+}
+
+.shelf-download-meta {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 10px;
+	color: rgba(255, 255, 255, 0.5);
+	font-variant-numeric: tabular-nums;
+}
+
+.shelf-download-speed {
+	color: #00f2fe;
+	font-weight: 600;
+}
+
+.shelf-download-status {
+	color: #34c759;
+	font-weight: 500;
+}
+
+.shelf-download-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+.shelf-dl-action-btn {
+	width: 24px;
+	height: 24px;
+	border-radius: 6px;
+	border: none;
+	background: rgba(255, 255, 255, 0.08);
+	color: rgba(255, 255, 255, 0.6);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.shelf-dl-action-btn:hover {
+	background: rgba(255, 255, 255, 0.16);
+	color: #ffffff;
+}
+
+.shelf-dl-action-btn.primary:hover {
+	background: rgba(0, 242, 254, 0.2);
+	color: #00f2fe;
+}
+
+.shelf-downloads-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	padding: 24px 16px;
+	gap: 6px;
+	color: rgba(255, 255, 255, 0.35);
+}
+
+.shelf-downloads-empty-title {
+	font-size: 12px;
+	font-weight: 600;
+	color: rgba(255, 255, 255, 0.7);
+}
+
+.shelf-downloads-empty-subtitle {
+	font-size: 10.5px;
+	max-width: 240px;
+	line-height: 1.35;
+	margin-bottom: 8px;
+}
+
+.shelf-open-folder-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 12px;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	color: rgba(255, 255, 255, 0.8);
+	font-size: 11px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.shelf-open-folder-btn:hover {
+	background: rgba(255, 255, 255, 0.14);
+	color: #ffffff;
 }
 
 
