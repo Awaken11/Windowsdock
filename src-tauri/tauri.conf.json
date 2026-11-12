@@ -1,0 +1,137 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Awaken",
+  "version": "1.0.0",
+  "identifier": "com.akhil.awaken",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "url": "index.html",
+        "title": "Awaken",
+        "width": 1920,
+        "height": 420,
+        "x": 0,
+        "y": 0,
+        "decorations": false,
+        "transparent": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
+        "focus": false,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false,
+        "dragDropEnabled": true
+      },
+      {
+        "label": "settings",
+        "create": false,
+        "title": "Awaken Settings",
+        "url": "settings.html",
+        "width": 740,
+        "height": 560,
+        "decorations": false,
+        "transparent": true,
+        "resizable": true,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "alwaysOnTop": false,
+        "visibleOnAllWorkspaces": false,
+        "focus": true,
+        "skipTaskbar": false,
+        "shadow": true,
+        "visible": false,
+        "center": true
+      },
+      {
+        "label": "overlay",
+        "title": "Awaken App Switcher",
+        "url": "overlay.html",
+        "width": 1920,
+        "height": 1080,
+        "x": 0,
+        "y": 0,
+        "decorations": false,
+        "transparent": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
+        "focus": false,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false,
+        "dragDropEnabled": true
+      },
+      {
+        "label": "dock",
+        "title": "Awaken Dock",
+        "url": "dock.html",
+        "width": 1920,
+        "height": 600,
+        "x": 0,
+        "y": 480,
+        "decorations": false,
+        "transparent": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
+        "focus": false,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ipc: http://ipc.localhost https://api.open-meteo.com https://geocoding-api.open-meteo.com https://ipapi.co http://ip-api.com"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": false,
+    "targets": "all",
+    "publisher": "Awaken",
+    "copyright": "Copyright © 2026 Awaken Contributors",
+    "category": "Utility",
+    "shortDescription": "Awaken - A modern Windows desktop experience featuring a Dynamic Island, intelligent Dock and productivity tools",
+    "longDescription": "Awaken replaces the Windows taskbar with an intelligent dock and adds a dynamic island for media, notifications, quick controls and status.",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      }
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "active": false,
+      "endpoints": [
+        "https://github.com/Awaken11/Windowsdock/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQzQTAzNTlBRUFFODRFMDUKUldRRlR1anFtaldnUThWRExWQ2ZDVmxhNGlFREFPYWZoV1BWbGdQNUxxdHpnbzZPbGh4SWxVMk0K"
+    }
+  }
+}

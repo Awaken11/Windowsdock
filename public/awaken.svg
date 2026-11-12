@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- A Shape Linear Gradient: Purple to Electric Cyan -->
+    <linearGradient id="aGradient" x1="15%" y1="90%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#6d28d9"/>
+      <stop offset="25%" stop-color="#8b5cf6"/>
+      <stop offset="50%" stop-color="#c4b5fd"/>
+      <stop offset="75%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#00f2fe"/>
+    </linearGradient>
+
+    <!-- Celestial Orbital Ring Gradient -->
+    <linearGradient id="orbitGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.95"/>
+      <stop offset="50%" stop-color="#818cf8" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#00f2fe" stop-opacity="0.95"/>
+    </linearGradient>
+
+    <!-- Glow Filter -->
+    <filter id="luminousGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="7" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Intense Planet Glow -->
+    <filter id="planetGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Back Portion of the Orbit Ring -->
+  <ellipse cx="256" cy="272" rx="200" ry="52" 
+           fill="none" 
+           stroke="url(#orbitGrad)" 
+           stroke-width="5"
+           stroke-dasharray="380 400"
+           stroke-dashoffset="190"
+           transform="rotate(-23 256 272)"
+           opacity="0.75"
+           filter="url(#luminousGlow)" />
+
+  <!-- The Stylized Uppercase A -->
+  <path d="M 256 100 
+           L 420 412 
+           L 348 412 
+           L 256 230 
+           L 164 412 
+           L 92 412 Z" 
+        fill="url(#aGradient)" 
+        filter="url(#luminousGlow)"/>
+
+  <!-- Front Portion of the Orbit Ring (Sweeping across front of A) -->
+  <ellipse cx="256" cy="272" rx="200" ry="52" 
+           fill="none" 
+           stroke="url(#orbitGrad)" 
+           stroke-width="5.5"
+           stroke-dasharray="320 460"
+           stroke-dashoffset="0"
+           transform="rotate(-23 256 272)"
+           filter="url(#luminousGlow)" />
+
+  <!-- Celestial Planet Node at ~top-right of Orbit -->
+  <circle cx="395" cy="174" r="11" fill="#00f2fe" filter="url(#planetGlow)"/>
+  <circle cx="395" cy="174" r="6" fill="#e0f2fe"/>
+</svg>

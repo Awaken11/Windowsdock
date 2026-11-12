@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="icon" type="image/svg+xml" href="/awaken.svg" />
+		<link rel="preload" as="image" href="/awaken.png" />
+		<link rel="stylesheet" href="/src/settings/loading.css" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Awaken Settings</title>
+	</head>
+
+	<body>
+		<div id="settings-loading" role="status" aria-label="Opening Awaken Settings">
+			<img src="/awaken.png" alt="" width="44" height="44" draggable="false" />
+		</div>
+		<div id="root" aria-busy="true"></div>
+		<script type="module" src="/src/Settings.tsx"></script>
+	</body>
+</html>

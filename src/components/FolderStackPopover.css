@@ -1,0 +1,346 @@
+.folder-stack-popover {
+	position: absolute;
+	width: 340px;
+	max-height: 380px;
+	background: rgba(22, 22, 24, 0.88);
+	backdrop-filter: blur(28px);
+	-webkit-backdrop-filter: blur(28px);
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	border-radius: 16px;
+	box-shadow:
+		0 24px 48px rgba(0, 0, 0, 0.6),
+		0 4px 16px rgba(0, 0, 0, 0.35),
+		inset 0 1px 0 rgba(255, 255, 255, 0.15);
+	color: #fff;
+	display: flex;
+	flex-direction: column;
+	z-index: 90;
+	pointer-events: auto;
+	user-select: none;
+	overflow: hidden;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	will-change: transform, opacity;
+	outline: none;
+}
+
+.folder-stack-popover:focus,
+.folder-stack-popover:focus-visible {
+	outline: none;
+}
+
+/* Header */
+.folder-stack-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 14px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.03);
+	flex-shrink: 0;
+}
+
+.folder-stack-title-group {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.folder-stack-header-icon {
+	width: 24px;
+	height: 24px;
+	object-fit: contain;
+	flex-shrink: 0;
+}
+
+.folder-stack-header-icon-fallback {
+	color: #38bdf8;
+	flex-shrink: 0;
+}
+
+.folder-stack-title-text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.folder-stack-name {
+	font-size: 13px;
+	font-weight: 600;
+	color: rgba(255, 255, 255, 0.95);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.folder-stack-count {
+	font-size: 11px;
+	color: rgba(255, 255, 255, 0.5);
+}
+
+.folder-stack-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.folder-stack-icon-btn {
+	background: transparent;
+	border: none;
+	color: rgba(255, 255, 255, 0.6);
+	width: 28px;
+	height: 28px;
+	border-radius: 6px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.folder-stack-icon-btn:hover {
+	background: rgba(255, 255, 255, 0.12);
+	color: #fff;
+}
+
+.folder-stack-icon-btn.active {
+	background: rgba(255, 255, 255, 0.16);
+	color: #38bdf8;
+}
+
+.folder-stack-close-btn:hover {
+	background: rgba(239, 68, 68, 0.2);
+	color: #ef4444;
+}
+
+/* Body */
+.folder-stack-body {
+	flex: 1;
+	max-height: 300px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding: 10px;
+}
+
+.folder-stack-body::-webkit-scrollbar {
+	width: 5px;
+}
+
+.folder-stack-body::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.folder-stack-body::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.2);
+	border-radius: 3px;
+}
+
+.folder-stack-loading,
+.folder-stack-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-height: 160px;
+	gap: 10px;
+	color: rgba(255, 255, 255, 0.5);
+	font-size: 12px;
+}
+
+.folder-stack-spinner {
+	width: 22px;
+	height: 22px;
+	border: 2px solid rgba(255, 255, 255, 0.15);
+	border-top-color: #38bdf8;
+	border-radius: 50%;
+	animation: folder-stack-spin 0.7s linear infinite;
+}
+
+@keyframes folder-stack-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.folder-stack-empty-icon {
+	color: rgba(255, 255, 255, 0.3);
+}
+
+/* Grid View */
+.folder-stack-grid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 8px;
+}
+
+.folder-stack-grid-item {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	padding: 8px 4px;
+	border-radius: 10px;
+	cursor: pointer;
+	transition: background 0.15s ease, transform 0.15s ease;
+	text-align: center;
+	min-height: 78px;
+}
+
+.folder-stack-grid-item:hover {
+	background: rgba(255, 255, 255, 0.1);
+	transform: translateY(-2px);
+}
+
+.folder-stack-grid-item:active {
+	transform: scale(0.96);
+}
+
+.folder-stack-grid-icon-wrap {
+	width: 38px;
+	height: 38px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: 6px;
+}
+
+.folder-stack-grid-icon {
+	width: 34px;
+	height: 34px;
+	object-fit: contain;
+}
+
+.folder-stack-grid-fallback-folder {
+	color: #38bdf8;
+}
+
+.folder-stack-grid-fallback-file {
+	color: rgba(255, 255, 255, 0.7);
+}
+
+.folder-stack-grid-label {
+	font-size: 11px;
+	line-height: 1.25;
+	color: rgba(255, 255, 255, 0.9);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	word-break: break-word;
+	max-width: 100%;
+}
+
+/* List View */
+.folder-stack-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.folder-stack-list-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 7px 10px;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: background 0.12s ease;
+	gap: 12px;
+}
+
+.folder-stack-list-row:hover {
+	background: rgba(255, 255, 255, 0.1);
+}
+
+.folder-stack-list-row:active {
+	background: rgba(255, 255, 255, 0.15);
+}
+
+.folder-stack-list-left {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+	flex: 1;
+}
+
+.folder-stack-list-icon {
+	width: 20px;
+	height: 20px;
+	object-fit: contain;
+	flex-shrink: 0;
+}
+
+.folder-stack-list-fallback-folder {
+	color: #38bdf8;
+	flex-shrink: 0;
+}
+
+.folder-stack-list-fallback-file {
+	color: rgba(255, 255, 255, 0.7);
+	flex-shrink: 0;
+}
+
+.folder-stack-list-name {
+	font-size: 12px;
+	color: rgba(255, 255, 255, 0.92);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.folder-stack-list-right {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-shrink: 0;
+	font-size: 11px;
+	color: rgba(255, 255, 255, 0.45);
+}
+
+.folder-stack-list-size {
+	min-width: 45px;
+	text-align: right;
+}
+
+.folder-stack-list-date {
+	min-width: 50px;
+	text-align: right;
+}
+
+/* Item Context Menu */
+.folder-stack-context-menu {
+	position: fixed;
+	background: rgba(30, 30, 34, 0.96);
+	backdrop-filter: blur(20px);
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	border-radius: 10px;
+	padding: 5px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	z-index: 100;
+	box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+	min-width: 170px;
+}
+
+.folder-stack-menu-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 10px;
+	background: transparent;
+	border: none;
+	color: rgba(255, 255, 255, 0.9);
+	font-size: 12px;
+	border-radius: 6px;
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.12s ease;
+}
+
+.folder-stack-menu-item:hover {
+	background: rgba(255, 255, 255, 0.12);
+	color: #fff;
+}
+
