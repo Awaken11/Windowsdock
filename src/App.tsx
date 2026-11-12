@@ -2472,6 +2472,41 @@ function App() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
+	const scratchpadTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+	const activateScratchpadFocus = useCallback(() => {
+		setNotchPinned(true);
+		invoke("activate_notch_input")
+			.then(() => {
+				void getCurrentWebviewWindow()
+					.setFocus()
+					.then(() => {
+						scratchpadTextareaRef.current?.focus();
+					})
+					.catch(() => {});
+			})
+			.catch(() => {});
+	}, [setNotchPinned]);
+
+	const deactivateScratchpadFocus = useCallback(() => {
+		setNotchPinned(false);
+		invoke("deactivate_notch_input").catch(() => {});
+	}, [setNotchPinned]);
+
+	useEffect(() => {
+		if (bloomMode === "notes" && isOpen) {
+			const timer = setTimeout(() => {
+				activateScratchpadFocus();
+			}, 80);
+			return () => {
+				clearTimeout(timer);
+				deactivateScratchpadFocus();
+			};
+		} else {
+			deactivateScratchpadFocus();
+		}
+	}, [bloomMode, isOpen, activateScratchpadFocus, deactivateScratchpadFocus]);
+
 	// In peek mode, briefly show the notch when a new track starts or playback
 	// resumes. The notch itself never switches views for media; the collapsed
 	// pill follows the live-activity rule below.
@@ -5029,10 +5064,16 @@ function App() {
 											</div>
 											<div className="notch-notes-body">
 												<textarea
+													ref={scratchpadTextareaRef}
 													className="notch-notes-textarea"
 													placeholder="Write quick markdown notes, snippets, to-dos, or scratch text..."
 													value={scratchpadNote}
 													onChange={(e) => setScratchpadNote(e.target.value)}
+													onFocus={activateScratchpadFocus}
+													onClick={activateScratchpadFocus}
+													onKeyDown={(e) => {
+														e.stopPropagation();
+													}}
 													onWheel={(e) => e.stopPropagation()}
 													autoFocus
 												/>

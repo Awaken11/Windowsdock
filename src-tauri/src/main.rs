@@ -245,7 +245,9 @@ fn main() {
             downloads::get_download_summary,
             downloads::open_download_file,
             downloads::show_download_in_folder,
-            downloads::open_downloads_folder
+            downloads::open_downloads_folder,
+            activate_notch_input,
+            deactivate_notch_input
         ])
         .setup(|app| {
             clipboard::start_clipboard_monitor(app.handle().clone());

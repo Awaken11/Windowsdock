@@ -1505,6 +1505,8 @@ fn click_through_style(style: u32, ignore: bool) -> u32 {
 ///
 /// This helper uses the raw Win32 call with the correct flags and re-stamps
 /// `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW` to prevent both problems.
+pub static NOTCH_INPUT_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 pub fn re_assert_topmost(hwnd: HWND) {
     unsafe {
         use windows::Win32::UI::WindowsAndMessaging::{
@@ -1525,7 +1527,11 @@ pub fn re_assert_topmost(hwnd: HWND) {
         // Re-stamp NOACTIVATE + TOOLWINDOW — HWND_TOPMOST can cause these to be reset
         // by the shell on some Windows builds
         let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as usize;
-        let new_ex = ex | WS_EX_NOACTIVATE.0 as usize | WS_EX_TOOLWINDOW.0 as usize;
+        let new_ex = if NOTCH_INPUT_ACTIVE.load(std::sync::atomic::Ordering::Relaxed) {
+            (ex & !(WS_EX_NOACTIVATE.0 as usize)) | WS_EX_TOOLWINDOW.0 as usize
+        } else {
+            ex | WS_EX_NOACTIVATE.0 as usize | WS_EX_TOOLWINDOW.0 as usize
+        };
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex as isize);
     }
 }

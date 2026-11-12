@@ -4751,3 +4751,80 @@ pub async fn activate_tray_icon(tray_id: String) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?
 }
+
+#[tauri::command]
+pub async fn activate_notch_input(app: AppHandle) -> bool {
+    let Some(window) = app.get_webview_window("main") else {
+        return false;
+    };
+    let Ok(hwnd) = window.hwnd() else {
+        return false;
+    };
+    let hwnd_val = hwnd.0 as isize;
+    crate::utils::NOTCH_INPUT_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+    tauri::async_runtime::spawn_blocking(move || unsafe {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetWindowLongPtrW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
+            GWL_EXSTYLE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+            WS_EX_NOACTIVATE,
+        };
+
+        let hwnd = HWND(hwnd_val as *mut _);
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as usize;
+        let new_ex = ex & !(WS_EX_NOACTIVATE.0 as usize);
+        let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex as isize);
+        let _ = SetWindowPos(
+            hwnd,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+        );
+
+        let _ = SetForegroundWindow(hwnd);
+        let _ = SetFocus(Some(hwnd));
+        true
+    })
+    .await
+    .unwrap_or(false)
+}
+
+#[tauri::command]
+pub async fn deactivate_notch_input(app: AppHandle) -> bool {
+    let Some(window) = app.get_webview_window("main") else {
+        return false;
+    };
+    let Ok(hwnd) = window.hwnd() else {
+        return false;
+    };
+    let hwnd_val = hwnd.0 as isize;
+    crate::utils::NOTCH_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+    tauri::async_runtime::spawn_blocking(move || unsafe {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos,
+            GWL_EXSTYLE, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+            WS_EX_NOACTIVATE,
+        };
+        let hwnd = HWND(hwnd_val as *mut _);
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as usize;
+        let new_ex = ex | (WS_EX_NOACTIVATE.0 as usize);
+        let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex as isize);
+        let _ = SetWindowPos(
+            hwnd,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+        );
+        true
+    })
+    .await
+    .unwrap_or(false)
+}
