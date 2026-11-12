@@ -684,7 +684,11 @@ pub fn is_start_menu_open() -> bool {
                     if ok.is_ok() {
                         let path = String::from_utf16_lossy(&buf[..len as usize]);
                         let file = path.rsplit('\\').next().unwrap_or("").to_lowercase();
-                        if file == "startmenuexperiencehost.exe" || file == "searchhost.exe" {
+                        if file == "startmenuexperiencehost.exe"
+                            || file == "searchhost.exe"
+                            || file == "searchapp.exe"
+                            || file == "shellexperiencehost.exe"
+                        {
                             return true;
                         }
                     }

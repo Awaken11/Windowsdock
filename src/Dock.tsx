@@ -234,6 +234,7 @@ const Dock = memo(function Dock() {
 		() => localStorage.getItem("bloom-dock-search-enabled") === "true"
 	);
 	const [hotkeyRevealed, setHotkeyRevealed] = useState(false);
+	const [startRevealed, setStartRevealed] = useState(false);
 	const [dockTaskView, setDockTaskView] = useState(
 		() => localStorage.getItem("bloom-dock-task-view") === "true"
 	);
@@ -342,7 +343,8 @@ const Dock = memo(function Dock() {
 		showAddPopup ||
 		nativeMenuOpen ||
 		!!activeFolderStack ||
-		hotkeyRevealed;
+		hotkeyRevealed ||
+		startRevealed;
 
 	const previewTimerRef = useRef<any>(null);
 	const isPreviewHoveredRef = useRef(false);
@@ -554,6 +556,19 @@ const Dock = memo(function Dock() {
 			setHotkeyRevealed((prev) => !prev);
 		});
 
+		const unlistenStartOpen = listen("dock-start-open", () => {
+			setStartRevealed(true);
+		});
+		const unlistenSearchOpen = listen("dock-search-open", () => {
+			setStartRevealed(true);
+		});
+		const unlistenStartClose = listen("dock-start-close", () => {
+			setStartRevealed(false);
+		});
+		const unlistenSearchClose = listen("dock-search-close", () => {
+			setStartRevealed(false);
+		});
+
 		return () => {
 			unlistenOverlap.then((f) => f());
 			unlistenInstalledApps.then((f) => f());
@@ -561,6 +576,10 @@ const Dock = memo(function Dock() {
 			unlistenVisibility.then((f) => f());
 			unlistenMaximized.then((f) => f());
 			unlistenHotkeyToggle.then((f) => f());
+			unlistenStartOpen.then((f) => f());
+			unlistenSearchOpen.then((f) => f());
+			unlistenStartClose.then((f) => f());
+			unlistenSearchClose.then((f) => f());
 		};
 	}, []);
 

@@ -241,6 +241,7 @@ unsafe extern "system" fn keyboard_hook_proc(
         // events (our own Start taps and mask key) must not re-enter it.
         if (kb.flags.0 & LLKHF_INJECTED.0) == 0 {
             static A_KEY_DOWN: AtomicBool = AtomicBool::new(false);
+            static WIN_CHORD_USED: AtomicBool = AtomicBool::new(false);
 
             if vk_code.0 == 0x41 {
                 if is_down {
@@ -345,35 +346,47 @@ unsafe extern "system" fn keyboard_hook_proc(
             if vk_code == VK_LWIN || vk_code == VK_RWIN {
                 if is_down {
                     WIN_KEY_DOWN.store(true, Ordering::Relaxed);
+                    WIN_CHORD_USED.store(false, Ordering::Relaxed);
                     // A fresh Win press always starts a fresh combo, even if the
                     // previous digit's keyup was missed.
                     WIN_NUMBER_HELD.store(0, Ordering::Relaxed);
                 } else if is_up {
                     WIN_KEY_DOWN.store(false, Ordering::Relaxed);
                     let had_number = WIN_NUMBER_HELD.swap(0, Ordering::Relaxed);
-                    if had_number == 0 {
+                    let had_chord = WIN_CHORD_USED.swap(false, Ordering::Relaxed);
+                    if had_number == 0 && !had_chord {
                         // Solitary Win key tap: user opened or closed Start Menu.
                         if let Some(app) = KEYBOARD_HOOK_APP_HANDLE
                             .get()
                             .cloned()
                             .or_else(|| WINDOW_CHANGE_APP_HANDLE.get().cloned())
                         {
-                            tauri::async_runtime::spawn(async move {
-                                for delay in [40, 100, 220] {
-                                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
-                                    let open = crate::commands::is_start_menu_open();
-                                    if open {
-                                        let _ = app.emit_to("dock", "dock-search-open", ());
-                                        break;
-                                    } else if delay == 220 {
-                                        let _ = app.emit_to("dock", "dock-search-close", ());
+                            let currently_open = crate::commands::is_start_menu_open();
+                            if currently_open {
+                                let _ = app.emit("dock-start-close", ());
+                                let _ = app.emit("dock-search-close", ());
+                            } else {
+                                let _ = app.emit("dock-start-open", ());
+                                let _ = app.emit("dock-search-open", ());
+
+                                tauri::async_runtime::spawn(async move {
+                                    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                                    let start_wait = std::time::Instant::now();
+                                    while start_wait.elapsed() < std::time::Duration::from_secs(60) {
+                                        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                                        if !crate::commands::is_start_menu_open() {
+                                            break;
+                                        }
                                     }
-                                }
-                            });
+                                    let _ = app.emit("dock-start-close", ());
+                                    let _ = app.emit("dock-search-close", ());
+                                });
+                            }
                         }
                     }
                 }
             } else if WIN_KEY_DOWN.load(Ordering::Relaxed) {
+                WIN_CHORD_USED.store(true, Ordering::Relaxed);
                 // Win + Space or Win + A: instant toggle dock reveal in peek/smart mode
                 if (hotkey_mode == "win_space" || hotkey_mode == "a_space" || hotkey_mode.is_empty())
                     && vk_code.0 == 0x20
@@ -402,17 +415,20 @@ unsafe extern "system" fn keyboard_hook_proc(
                         .cloned()
                         .or_else(|| WINDOW_CHANGE_APP_HANDLE.get().cloned())
                     {
+                        let _ = app.emit("dock-start-open", ());
+                        let _ = app.emit("dock-search-open", ());
+
                         tauri::async_runtime::spawn(async move {
-                            for delay in [40, 100, 220] {
-                                tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
-                                let open = crate::commands::is_start_menu_open();
-                                if open {
-                                    let _ = app.emit_to("dock", "dock-search-open", ());
+                            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                            let start_wait = std::time::Instant::now();
+                            while start_wait.elapsed() < std::time::Duration::from_secs(60) {
+                                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                                if !crate::commands::is_start_menu_open() {
                                     break;
-                                } else if delay == 220 {
-                                    let _ = app.emit_to("dock", "dock-search-close", ());
                                 }
                             }
+                            let _ = app.emit("dock-start-close", ());
+                            let _ = app.emit("dock-search-close", ());
                         });
                     }
                 }
@@ -592,9 +608,11 @@ unsafe extern "system" fn window_change_event_proc(
         if let Some(app) = WINDOW_CHANGE_APP_HANDLE.get().cloned() {
             tauri::async_runtime::spawn(async move {
                 if start_open {
-                    let _ = app.emit_to("dock", "dock-search-open", ());
+                    let _ = app.emit("dock-start-open", ());
+                    let _ = app.emit("dock-search-open", ());
                 } else {
-                    let _ = app.emit_to("dock", "dock-search-close", ());
+                    let _ = app.emit("dock-start-close", ());
+                    let _ = app.emit("dock-search-close", ());
                 }
             });
         }

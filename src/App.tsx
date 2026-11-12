@@ -109,8 +109,8 @@ import {
  *   Dragging files onto the notch also opens the shelf. Wheel/swipe switches
  *   between tool panels, including when a live activity occupies the pill.
  */
-type NotchPanel = "calendar" | "command-center" | "devices";
-const NOTCH_PANELS: readonly NotchPanel[] = ["calendar", "command-center", "devices"];
+type NotchPanel = "calendar" | "command-center" | "devices" | "notes";
+const NOTCH_PANELS: readonly NotchPanel[] = ["calendar", "command-center", "devices", "notes"];
 const asNotchPanel = (value: unknown): NotchPanel | null =>
 	NOTCH_PANELS.includes(value as NotchPanel) ? (value as NotchPanel) : null;
 
@@ -483,6 +483,7 @@ type BloomMode =
 	| "music"
 	| "calendar"
 	| "command-center"
+	| "notes"
 	| "announcement"
 	| "status"
 	| "shelf"
@@ -1614,7 +1615,7 @@ function App() {
 		}
 	}, [shelfItems, shelfPersist]);
 
-	const [shelfTab, setShelfTab] = useState<"files" | "notes" | "downloads">("files");
+	const [shelfTab, setShelfTab] = useState<"files" | "downloads">("files");
 	const [scratchpadNote, setScratchpadNote] = useState(
 		() => localStorage.getItem("awaken-scratchpad-note") || ""
 	);
@@ -2186,7 +2187,9 @@ function App() {
 	function panelEnabled(panel: NotchPanel) {
 		if (panel === "calendar") return settingsCalendarEnabled;
 		if (panel === "command-center") return settingsControlsPanelEnabled;
-		return settingsDevicesPanelEnabled;
+		if (panel === "devices") return settingsDevicesPanelEnabled;
+		if (panel === "notes") return true;
+		return true;
 	}
 
 	// Settings keeps at least one panel on; if a hand-edited settings file turns
@@ -2419,12 +2422,10 @@ function App() {
 	const showShelfBubble =
 		shelfItems.length > 0 && !isOpen && isVisible && !isHidden && bloomMode !== "announcement" && bloomMode !== "shelf";
 	const hasActiveDownloads = (downloadSummary?.active_count ?? 0) > 0;
-	const recentDownloadsCount = downloadSummary?.recent_completed.length ?? 0;
-	const downloadsCount = hasActiveDownloads
-		? (downloadSummary?.active_count ?? 0)
-		: recentDownloadsCount;
+	const activeDownloadsCount = downloadSummary?.active_count ?? 0;
 	const showDownloadsBubble =
-		downloadsCount > 0 &&
+		hasActiveDownloads &&
+		activeDownloadsCount > 0 &&
 		!isOpen &&
 		isVisible &&
 		!isHidden &&
@@ -3533,6 +3534,7 @@ function App() {
 		if (bloomMode === "notifications") return 400;
 		if (isCalendarMode) return 480;
 		if (bloomMode === "shelf") return 420;
+		if (bloomMode === "notes") return 420;
 		if (bloomMode === "clipboard") {
 			if (zoomedImageItem) return 520;
 			return displayClipboardItems.length <= 1 ? 320 : 490;
@@ -3590,6 +3592,9 @@ function App() {
 		// plus room for the scrollbar once the tiles overflow it.
 		if (bloomMode === "shelf") {
 			return 280;
+		}
+		if (bloomMode === "notes") {
+			return 260;
 		}
 		if (bloomMode === "clipboard") {
 			if (zoomedImageItem) return 340;
@@ -4967,6 +4972,73 @@ function App() {
 									)}
 								</AnimatePresence>
 
+								{/* Scratchpad Notes Panel */}
+								<AnimatePresence>
+									{bloomMode === "notes" && (
+										<motion.div
+											key="notes-panel"
+											className="notch-notes-content"
+											onClick={(e) => e.stopPropagation()}
+											initial={{ opacity: 0 }}
+											animate={{ opacity: 1 }}
+											exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
+											transition={{ type: "spring", stiffness: 400, damping: 30 }}
+										>
+											<div className="notch-notes-header">
+												<div className="notch-notes-title-group">
+													<FileEdit size={13} strokeWidth={2.2} />
+													<span className="notch-notes-title">Scratchpad</span>
+													<span className="notch-notes-stats">
+														{scratchpadNote.trim().length === 0
+															? "Empty note"
+															: `${scratchpadNote.trim().split(/\s+/).filter(Boolean).length} words · ${scratchpadNote.length} chars`}
+													</span>
+												</div>
+												<div className="notch-notes-actions">
+													{scratchpadNote.length > 0 && (
+														<button
+															type="button"
+															className="notch-notes-btn"
+															title="Clear note"
+															onClick={() => setScratchpadNote("")}
+														>
+															<Trash2 size={11} />
+															<span>Clear</span>
+														</button>
+													)}
+													<button
+														type="button"
+														className={`notch-notes-btn primary ${noteCopied ? "copied" : ""}`}
+														title="Copy note to clipboard"
+														onClick={async () => {
+															try {
+																await writeText(scratchpadNote);
+															} catch {
+																await navigator.clipboard.writeText(scratchpadNote).catch(() => {});
+															}
+															setNoteCopied(true);
+															setTimeout(() => setNoteCopied(false), 1200);
+														}}
+													>
+														{noteCopied ? <CheckCircle2 size={11} /> : <Copy size={11} />}
+														<span>{noteCopied ? "Copied" : "Copy Note"}</span>
+													</button>
+												</div>
+											</div>
+											<div className="notch-notes-body">
+												<textarea
+													className="notch-notes-textarea"
+													placeholder="Write quick markdown notes, snippets, to-dos, or scratch text..."
+													value={scratchpadNote}
+													onChange={(e) => setScratchpadNote(e.target.value)}
+													onWheel={(e) => e.stopPropagation()}
+													autoFocus
+												/>
+											</div>
+										</motion.div>
+									)}
+								</AnimatePresence>
+
 								{/* Shelf Panel */}
 								<AnimatePresence>
 									{bloomMode === "shelf" && (
@@ -4993,23 +5065,14 @@ function App() {
 													</button>
 													<button
 														type="button"
-														className={`shelf-tab-btn ${shelfTab === "notes" ? "active" : ""}`}
-														onClick={() => setShelfTab("notes")}
-													>
-														<FileEdit size={12} strokeWidth={2.2} />
-														<span>Scratchpad</span>
-														{scratchpadNote.trim().length > 0 && <span className="shelf-notes-dot" />}
-													</button>
-													<button
-														type="button"
 														className={`shelf-tab-btn ${shelfTab === "downloads" ? "active" : ""}`}
 														onClick={() => setShelfTab("downloads")}
 													>
 														<ArrowDown size={12} strokeWidth={2.2} className={hasActiveDownloads ? "download-pulse-icon" : ""} />
 														<span>Downloads</span>
-														{downloadsCount > 0 && (
-															<span className={`shelf-header-badge ${hasActiveDownloads ? "badge-active" : ""}`}>
-																{downloadsCount}
+														{hasActiveDownloads && (
+															<span className="shelf-header-badge badge-active">
+																{downloadSummary?.active_count ?? 0}
 															</span>
 														)}
 													</button>
@@ -5041,61 +5104,7 @@ function App() {
 												)}
 											</div>
 											<AnimatePresence mode="wait">
-												{shelfTab === "notes" ? (
-													<motion.div
-														key="shelf-tab-notes"
-														initial={{ opacity: 0, y: 4 }}
-														animate={{ opacity: 1, y: 0 }}
-														exit={{ opacity: 0, y: -4 }}
-														transition={{ duration: 0.12 }}
-														className="shelf-scratchpad-view"
-													>
-														<textarea
-															className="shelf-scratchpad-textarea"
-															placeholder="Write quick notes, markdown snippets, or paste text..."
-															value={scratchpadNote}
-															onChange={(e) => setScratchpadNote(e.target.value)}
-															autoFocus
-														/>
-														<div className="shelf-scratchpad-footer">
-															<div className="shelf-scratchpad-stats">
-																{scratchpadNote.trim().length === 0
-																	? "Empty note"
-																	: `${scratchpadNote.trim().split(/\s+/).filter(Boolean).length} words · ${scratchpadNote.length} chars`}
-															</div>
-															<div className="shelf-scratchpad-actions">
-																{scratchpadNote.length > 0 && (
-																	<button
-																		type="button"
-																		className="shelf-scratchpad-btn"
-																		title="Clear note"
-																		onClick={() => setScratchpadNote("")}
-																	>
-																		<Trash2 size={11} />
-																		<span>Clear</span>
-																	</button>
-																)}
-																<button
-																	type="button"
-																	className={`shelf-scratchpad-btn primary ${noteCopied ? "copied" : ""}`}
-																	title="Copy note to clipboard"
-																	onClick={async () => {
-																		try {
-																			await writeText(scratchpadNote);
-																		} catch {
-																			await navigator.clipboard.writeText(scratchpadNote).catch(() => {});
-																		}
-																		setNoteCopied(true);
-																		setTimeout(() => setNoteCopied(false), 1200);
-																	}}
-																>
-																	{noteCopied ? <Check size={11} /> : <Copy size={11} />}
-																	<span>{noteCopied ? "Copied" : "Copy Note"}</span>
-																</button>
-															</div>
-														</div>
-													</motion.div>
-												) : shelfTab === "downloads" ? (
+												{shelfTab === "downloads" ? (
 													<motion.div
 														key="shelf-tab-downloads"
 														initial={{ opacity: 0, y: 4 }}
@@ -5959,8 +5968,8 @@ function App() {
 							key="downloads-bubble"
 							ref={downloadsBubbleRef}
 							type="button"
-							className={`activity-bubble downloads-bubble ${isHovered ? "expanded" : ""} ${hasActiveDownloads ? "active-downloading" : ""}`}
-							aria-label={`Open downloads: ${downloadsCount} file${downloadsCount === 1 ? "" : "s"}`}
+							className={`activity-bubble downloads-bubble ${isHovered ? "expanded" : ""} active-downloading`}
+							aria-label={`Open downloads: ${activeDownloadsCount} file${activeDownloadsCount === 1 ? "" : "s"}`}
 							style={{ right: "50%" }}
 							initial={{ opacity: 0, scale: 0.4, x: 28, marginRight: downloadsBubbleMarginRight }}
 							animate={{ opacity: 1, scale: 1, x: 0, marginRight: downloadsBubbleMarginRight }}
@@ -5979,8 +5988,8 @@ function App() {
 								openNotch("shelf");
 							}}
 						>
-							<ArrowDown size={12} strokeWidth={2.4} className={hasActiveDownloads ? "download-pulse-icon" : ""} />
-							<span>{downloadsCount}</span>
+							<ArrowDown size={12} strokeWidth={2.4} className="download-pulse-icon" />
+							<span>{activeDownloadsCount}</span>
 						</motion.button>
 					)}
 				</AnimatePresence>
