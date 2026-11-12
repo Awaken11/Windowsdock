@@ -41,6 +41,7 @@ Edit `settings.json` with any text editor while Bloom is running. Changes are ap
 | `bloom-dock-material`              | `"glass"` / `"acrylic"` / `"mica"` / `"solid"` | `"glass"` | Dock backdrop blur and surface material styling.                                                                                                |
 | `bloom-dock-icon-theme`            | `"native"` / `"squircle"` / `"neon"` / `"monochrome"` | `"native"` | Icon pack theme applied to dock icons (native, macOS-style squircles, cyber neon, or minimal monochrome).                                      |
 | `bloom-dock-downloads-enabled`     | `"true"` / `"false"`             | `"true"`      | Show the Downloads Progress Hub on the left dock to track ongoing browser and system downloads in real-time.                                     |
+| `bloom-dock-toggle-hotkey`         | `"a_space"` / `"win_space"` / `"win_a"` / `"alt_space"` / `"alt_a"` / `"ctrl_space"` | `"a_space"` | Global hotkey combination to toggle the dock visible or hidden on demand (`A + Space` by default).                                         |
 
 ### Notch
 

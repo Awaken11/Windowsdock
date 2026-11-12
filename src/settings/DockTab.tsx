@@ -147,6 +147,8 @@ interface DockTabProps {
 	handleDockIconThemeChange: (theme: string) => void;
 	dockDownloadsEnabled: boolean;
 	toggleDockDownloads: () => void;
+	dockToggleHotkey: string;
+	handleDockToggleHotkeyChange: (hotkey: string) => void;
 }
 
 export function DockTab({
@@ -190,7 +192,9 @@ export function DockTab({
 	dockIconTheme,
 	handleDockIconThemeChange,
 	dockDownloadsEnabled,
-	toggleDockDownloads
+	toggleDockDownloads,
+	dockToggleHotkey,
+	handleDockToggleHotkeyChange
 }: DockTabProps) {
 	const handleStartIconUpload = (e: ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
@@ -360,6 +364,25 @@ export function DockTab({
 								/>
 								<span className="slider"></span>
 							</label>
+						</SettingRow>
+
+						<SettingRow
+							icon={Keyboard}
+							label="Dock Toggle Hotkey"
+							desc="Global hotkey to toggle the dock visible or hidden on demand"
+						>
+							<select
+								className="settings-select"
+								value={dockToggleHotkey}
+								onChange={(e) => handleDockToggleHotkeyChange(e.target.value)}
+							>
+								<option value="a_space">A + Space (Awaken Chord)</option>
+								<option value="win_space">Win + Space</option>
+								<option value="win_a">Win + A</option>
+								<option value="alt_space">Alt + Space</option>
+								<option value="alt_a">Alt + A</option>
+								<option value="ctrl_space">Ctrl + Space</option>
+							</select>
 						</SettingRow>
 
 						{dockMode === "fixed" && (

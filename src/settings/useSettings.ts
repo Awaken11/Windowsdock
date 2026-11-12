@@ -151,6 +151,9 @@ export function useSettings() {
 	const [dockDownloadsEnabled, setDockDownloadsEnabled] = useState(
 		() => localStorage.getItem("bloom-dock-downloads-enabled") !== "false"
 	);
+	const [dockToggleHotkey, setDockToggleHotkey] = useState(
+		() => localStorage.getItem("bloom-dock-toggle-hotkey") || "a_space"
+	);
 	const [dockMode, setDockMode] = useState(() => {
 		// "smart" is the fresh-install default — keep in step with App.tsx,
 		// Dock.tsx, and the backend fallback in commands.rs.
@@ -263,6 +266,7 @@ export function useSettings() {
 			apply(getVal("bloom-dock-material"), setDockMaterial, (v) => v);
 			apply(getVal("bloom-dock-icon-theme"), setDockIconTheme, (v) => v);
 			apply(getVal("bloom-dock-downloads-enabled"), setDockDownloadsEnabled, (v) => v !== "false");
+			apply(getVal("bloom-dock-toggle-hotkey"), setDockToggleHotkey, (v) => v);
 
 			apply(getVal("bloom-temp-unit"), setTempUnitFahrenheit, (v) => v === "fahrenheit");
 			apply(getVal("bloom-scale"), setScale, parseFloat);
@@ -411,6 +415,7 @@ export function useSettings() {
 		"bloom-dock-material": setDockMaterial,
 		"bloom-dock-icon-theme": setDockIconTheme,
 		"bloom-dock-downloads-enabled": setDockDownloadsEnabled,
+		"bloom-dock-toggle-hotkey": setDockToggleHotkey,
 		"bloom-weather-enabled": setWeatherEnabled,
 		"bloom-calendar-enabled": setCalendarEnabled,
 		"bloom-calendar-monday-first": setCalendarMondayFirst,
@@ -831,6 +836,11 @@ export function useSettings() {
 		saveSetting("bloom-dock-downloads-enabled", String(next));
 	};
 
+	const handleDockToggleHotkeyChange = (hotkey: string) => {
+		setDockToggleHotkey(hotkey);
+		saveSetting("bloom-dock-toggle-hotkey", hotkey);
+	};
+
 	const toggleAutoUpdate = () => {
 		const next = !autoUpdate;
 		setAutoUpdate(next);
@@ -1149,6 +1159,8 @@ export function useSettings() {
 		handleDockIconThemeChange,
 		dockDownloadsEnabled,
 		toggleDockDownloads,
+		dockToggleHotkey,
+		handleDockToggleHotkeyChange,
 
 		// Overlays
 		volumeOverlayEnabled,

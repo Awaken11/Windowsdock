@@ -111,6 +111,65 @@ fn win_key_physically_down() -> bool {
     }
 }
 
+fn dock_toggle_hotkey() -> String {
+    let Some(app) = KEYBOARD_HOOK_APP_HANDLE.get() else {
+        return "a_space".into();
+    };
+    crate::utils::get_setting_str(app, "bloom-dock-toggle-hotkey")
+        .unwrap_or_else(|| "a_space".into())
+}
+
+fn a_key_physically_down() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+    unsafe { (GetAsyncKeyState(0x41) as u16 & 0x8000) != 0 }
+}
+
+fn alt_key_physically_down() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+    unsafe { (GetAsyncKeyState(0x12) as u16 & 0x8000) != 0 }
+}
+
+fn ctrl_key_physically_down() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+    unsafe { (GetAsyncKeyState(0x11) as u16 & 0x8000) != 0 }
+}
+
+fn send_backspace() {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        SendInput, INPUT, INPUT_0, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY,
+    };
+    let back = VIRTUAL_KEY(0x08);
+    let inputs = [
+        INPUT {
+            r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: back,
+                    wScan: 0,
+                    dwFlags: Default::default(),
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+        INPUT {
+            r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: back,
+                    wScan: 0,
+                    dwFlags: KEYEVENTF_KEYUP,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+    ];
+    unsafe {
+        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
 /// Explorer opens the Start menu when it only sees a Win keydown and keyup.
 /// Swallowing a Win+Number combo would look exactly like that on Win release,
 /// so a tap of an unassigned key is injected first — the same trick as
@@ -181,6 +240,91 @@ unsafe extern "system" fn keyboard_hook_proc(
         // Only physical presses drive the Win+Number replacement; injected
         // events (our own Start taps and mask key) must not re-enter it.
         if (kb.flags.0 & LLKHF_INJECTED.0) == 0 {
+            static A_KEY_DOWN: AtomicBool = AtomicBool::new(false);
+
+            if vk_code.0 == 0x41 {
+                if is_down {
+                    A_KEY_DOWN.store(true, Ordering::Relaxed);
+                } else if is_up {
+                    A_KEY_DOWN.store(false, Ordering::Relaxed);
+                }
+            }
+
+            let hotkey_mode = dock_toggle_hotkey();
+
+            // A + Space (Awaken Chord):
+            if (hotkey_mode == "a_space" || hotkey_mode.is_empty())
+                && vk_code.0 == 0x20
+                && is_down
+                && (A_KEY_DOWN.load(Ordering::Relaxed) || a_key_physically_down())
+            {
+                if let Some(app) = KEYBOARD_HOOK_APP_HANDLE
+                    .get()
+                    .cloned()
+                    .or_else(|| WINDOW_CHANGE_APP_HANDLE.get().cloned())
+                {
+                    tauri::async_runtime::spawn(async move {
+                        let _ = app.emit_to("dock", "dock-toggle-hotkey", ());
+                    });
+                }
+                send_backspace();
+                return windows::Win32::Foundation::LRESULT(1);
+            }
+
+            // Alt + Space:
+            if hotkey_mode == "alt_space"
+                && vk_code.0 == 0x20
+                && is_down
+                && alt_key_physically_down()
+            {
+                if let Some(app) = KEYBOARD_HOOK_APP_HANDLE
+                    .get()
+                    .cloned()
+                    .or_else(|| WINDOW_CHANGE_APP_HANDLE.get().cloned())
+                {
+                    tauri::async_runtime::spawn(async move {
+                        let _ = app.emit_to("dock", "dock-toggle-hotkey", ());
+                    });
+                }
+                return windows::Win32::Foundation::LRESULT(1);
+            }
+
+            // Alt + A:
+            if hotkey_mode == "alt_a"
+                && vk_code.0 == 0x41
+                && is_down
+                && alt_key_physically_down()
+            {
+                if let Some(app) = KEYBOARD_HOOK_APP_HANDLE
+                    .get()
+                    .cloned()
+                    .or_else(|| WINDOW_CHANGE_APP_HANDLE.get().cloned())
+                {
+                    tauri::async_runtime::spawn(async move {
+                        let _ = app.emit_to("dock", "dock-toggle-hotkey", ());
+                    });
+                }
+                return windows::Win32::Foundation::LRESULT(1);
+            }
+
+            // Ctrl + Space:
+            if hotkey_mode == "ctrl_space"
+                && vk_code.0 == 0x20
+                && is_down
+                && ctrl_key_physically_down()
+            {
+                if let Some(app) = KEYBOARD_HOOK_APP_HANDLE
+                    .get()
+                    .cloned()
+                    .or_else(|| WINDOW_CHANGE_APP_HANDLE.get().cloned())
+                {
+                    tauri::async_runtime::spawn(async move {
+                        let _ = app.emit_to("dock", "dock-toggle-hotkey", ());
+                    });
+                }
+                return windows::Win32::Foundation::LRESULT(1);
+            }
+
             if vk_code == windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE
                 && is_down
                 && MENU_IS_OPEN.load(Ordering::Relaxed)
@@ -230,8 +374,20 @@ unsafe extern "system" fn keyboard_hook_proc(
                     }
                 }
             } else if WIN_KEY_DOWN.load(Ordering::Relaxed) {
-                // Win + Space: instant toggle dock reveal in peek/smart mode
-                if vk_code.0 == 0x20 && is_down {
+                // Win + Space or Win + A: instant toggle dock reveal in peek/smart mode
+                if (hotkey_mode == "win_space" || hotkey_mode == "a_space" || hotkey_mode.is_empty())
+                    && vk_code.0 == 0x20
+                    && is_down
+                {
+                    if let Some(app) = KEYBOARD_HOOK_APP_HANDLE.get().cloned() {
+                        tauri::async_runtime::spawn(async move {
+                            let _ = app.emit_to("dock", "dock-toggle-hotkey", ());
+                        });
+                    }
+                    send_start_menu_mask();
+                    return windows::Win32::Foundation::LRESULT(1);
+                }
+                if hotkey_mode == "win_a" && vk_code.0 == 0x41 && is_down {
                     if let Some(app) = KEYBOARD_HOOK_APP_HANDLE.get().cloned() {
                         tauri::async_runtime::spawn(async move {
                             let _ = app.emit_to("dock", "dock-toggle-hotkey", ());

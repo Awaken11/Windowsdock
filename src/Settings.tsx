@@ -330,6 +330,8 @@ function SettingsApp() {
 							handleDockIconThemeChange={settings.handleDockIconThemeChange}
 							dockDownloadsEnabled={settings.dockDownloadsEnabled}
 							toggleDockDownloads={settings.toggleDockDownloads}
+							dockToggleHotkey={settings.dockToggleHotkey}
+							handleDockToggleHotkeyChange={settings.handleDockToggleHotkeyChange}
 						/>
 					)}
 					{activeTab === "overlays" && (
