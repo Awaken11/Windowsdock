@@ -1896,6 +1896,7 @@ function App() {
 	const rememberPanelRef = useRef<(panel: NotchPanel) => void>(() => {});
 	const notchPinnedRef = useRef(false);
 	const releaseDeferredRef = useRef(false);
+	const scratchpadTextareaRef = useRef<HTMLTextAreaElement>(null);
 
 	// Shared hover-release, called on DOM hover end and when the backend
 	// reports the pointer left the (now click-through) notch window. Closes an
@@ -1922,6 +1923,7 @@ function App() {
 			prev === "calendar" ||
 			prev === "status" ||
 			prev === "shelf" ||
+			prev === "notes" ||
 			prev === "clipboard" ||
 			prev === "wifi" ||
 			prev === "bluetooth" ||
@@ -1930,6 +1932,8 @@ function App() {
 				? restingModeRef.current
 				: prev
 		);
+		scratchpadTextareaRef.current?.blur();
+		invoke("deactivate_notch_input").catch(() => {});
 	};
 
 	const clearShelfCollapse = () => {
@@ -2472,10 +2476,7 @@ function App() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	const scratchpadTextareaRef = useRef<HTMLTextAreaElement>(null);
-
 	const activateScratchpadFocus = useCallback(() => {
-		setNotchPinned(true);
 		invoke("activate_notch_input")
 			.then(() => {
 				void getCurrentWebviewWindow()
@@ -2486,12 +2487,11 @@ function App() {
 					.catch(() => {});
 			})
 			.catch(() => {});
-	}, [setNotchPinned]);
+	}, []);
 
 	const deactivateScratchpadFocus = useCallback(() => {
-		setNotchPinned(false);
 		invoke("deactivate_notch_input").catch(() => {});
-	}, [setNotchPinned]);
+	}, []);
 
 	useEffect(() => {
 		if (bloomMode === "notes" && isOpen) {
@@ -3569,7 +3569,7 @@ function App() {
 		if (bloomMode === "notifications") return 400;
 		if (isCalendarMode) return 480;
 		if (bloomMode === "shelf") return 420;
-		if (bloomMode === "notes") return 420;
+		if (bloomMode === "notes" && isOpen) return 420;
 		if (bloomMode === "clipboard") {
 			if (zoomedImageItem) return 520;
 			return displayClipboardItems.length <= 1 ? 320 : 490;
@@ -3629,7 +3629,7 @@ function App() {
 			return 280;
 		}
 		if (bloomMode === "notes") {
-			return 270;
+			return isOpen ? 270 : 36;
 		}
 		if (bloomMode === "clipboard") {
 			if (zoomedImageItem) return 340;
@@ -5071,6 +5071,7 @@ function App() {
 													onChange={(e) => setScratchpadNote(e.target.value)}
 													onFocus={activateScratchpadFocus}
 													onClick={activateScratchpadFocus}
+													onBlur={deactivateScratchpadFocus}
 													onKeyDown={(e) => {
 														e.stopPropagation();
 													}}
